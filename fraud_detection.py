@@ -25,6 +25,7 @@ from xgboost import XGBClassifier
 FEATURE_COLUMNS = [f"V{i}" for i in range(1, 29)]
 AMOUNT_COLUMN = "Amount"
 TARGET_COLUMN = "Class"
+DEFAULT_THRESHOLD = 0.5
 
 
 def _validate_required_columns(frame: pd.DataFrame, *, for_inference: bool = False) -> None:
@@ -59,11 +60,7 @@ def prepare_training_frame(
 
 
 def prepare_inference_frame(frame: pd.DataFrame, scaler: StandardScaler) -> pd.DataFrame:
-    """Prepare inference features; do not scale an already-standardized scaled_amount twice.
-
-    If raw Amount is present, it is transformed with the training scaler. If only
-    scaled_amount is present, its values are treated as already standardized.
-    """
+    """Prepare inference features without scaling an already-standardized amount twice."""
     working = frame.copy()
     working = working.drop(columns=[c for c in (TARGET_COLUMN, "Time") if c in working.columns])
     _validate_required_columns(working, for_inference=True)
@@ -105,13 +102,14 @@ def _threshold_metrics(
 ) -> Dict[str, Any]:
     predictions = (probabilities >= threshold).astype(int)
     precision, recall, pr_thresholds = precision_recall_curve(y_true, probabilities)
+    average_precision = float(average_precision_score(y_true, probabilities))
     return {
         "threshold": float(threshold),
         "precision": float(precision_score(y_true, predictions, zero_division=0)),
         "recall": float(recall_score(y_true, predictions, zero_division=0)),
         "roc_auc": float(roc_auc_score(y_true, probabilities)),
-        "average_precision": float(average_precision_score(y_true, probabilities)),
-        "auprc": float(average_precision_score(y_true, probabilities)),
+        "average_precision": average_precision,
+        "auprc": average_precision,
         "mcc": float(matthews_corrcoef(y_true, predictions)),
         "confusion_matrix": confusion_matrix(y_true, predictions).tolist(),
         "pr_curve": {
@@ -123,10 +121,10 @@ def _threshold_metrics(
 
 
 def select_threshold(y_true: pd.Series, probabilities: np.ndarray) -> float:
-    """Select the threshold maximizing F1 on validation data (never the final test set)."""
+    """Select the threshold maximizing F1 on validation data."""
     precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
     if thresholds.size == 0:
-        return 0.5
+        return DEFAULT_THRESHOLD
     denominator = precision[:-1] + recall[:-1]
     f1 = np.divide(
         2 * precision[:-1] * recall[:-1],
@@ -141,15 +139,15 @@ def evaluate_model(
     model: VotingClassifier,
     X_test: pd.DataFrame,
     y_test: pd.Series,
-    threshold: float = 0.5,
+    threshold: float = DEFAULT_THRESHOLD,
 ) -> Dict[str, Any]:
-    """Evaluate predictions at a chosen threshold and include precision-recall curve data."""
+    """Evaluate predictions at a chosen threshold."""
     probabilities = model.predict_proba(X_test)[:, 1]
     return _threshold_metrics(y_test, probabilities, threshold)
 
 
 def train_pipeline(frame: pd.DataFrame, random_state: int = 42) -> Dict[str, Any]:
-    """Train on one split, tune threshold on validation, and evaluate once on held-out test data."""
+    """Train, tune threshold on validation data, and evaluate on held-out test data."""
     if TARGET_COLUMN not in frame.columns:
         raise ValueError(f"The dataset must contain the target column '{TARGET_COLUMN}'.")
 
@@ -173,7 +171,7 @@ def train_pipeline(frame: pd.DataFrame, random_state: int = 42) -> Dict[str, Any
     X_val, _ = prepare_training_frame(X_val_raw, scaler=scaler)
     X_test, _ = prepare_training_frame(X_test_raw, scaler=scaler)
 
-    # Resampling is restricted to the training partition to avoid leakage.
+    # SMOTE is applied only to the training partition to avoid leakage.
     smote = SMOTE(random_state=random_state)
     X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train)
 
@@ -201,9 +199,27 @@ def save_artifacts(
     scaler: StandardScaler,
     model_path: str = "ensemble_model.joblib",
     scaler_path: str = "scaler.joblib",
+    threshold: Optional[float] = None,
+    threshold_path: str = "threshold.joblib",
 ) -> None:
+    """Save model/scaler and, when supplied, the validation-selected threshold."""
     joblib.dump(model, model_path)
     joblib.dump(scaler, scaler_path)
+    if threshold is not None:
+        if not 0.0 <= float(threshold) <= 1.0:
+            raise ValueError("threshold must be between 0 and 1.")
+        joblib.dump(float(threshold), threshold_path)
+
+
+def load_threshold(threshold_path: str = "threshold.joblib") -> float:
+    """Load the saved decision threshold, falling back for older model artifacts."""
+    path = Path(threshold_path)
+    if not path.exists():
+        return DEFAULT_THRESHOLD
+    threshold = float(joblib.load(path))
+    if not np.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+        raise ValueError(f"Invalid saved threshold in {path}; expected a value from 0 to 1.")
+    return threshold
 
 
 def load_artifacts(
@@ -216,9 +232,10 @@ def load_artifacts(
 
 
 __all__ = [
-    "AMOUNT_COLUMN", "FEATURE_COLUMNS", "TARGET_COLUMN", "evaluate_model",
-    "load_artifacts", "make_soft_voting_model", "prepare_inference_frame",
-    "prepare_training_frame", "save_artifacts", "select_threshold", "train_pipeline",
+    "AMOUNT_COLUMN", "DEFAULT_THRESHOLD", "FEATURE_COLUMNS", "TARGET_COLUMN",
+    "evaluate_model", "load_artifacts", "load_threshold", "make_soft_voting_model",
+    "prepare_inference_frame", "prepare_training_frame", "save_artifacts",
+    "select_threshold", "train_pipeline",
 ]
 
 
