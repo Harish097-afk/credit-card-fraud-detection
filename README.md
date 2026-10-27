@@ -65,9 +65,9 @@ A model estimates a fraud probability. A threshold converts that probability int
 
 ## Evaluation results
 
-The figure below is the comparison visualization supplied for this project. It contains model-score comparisons, ROC curves, precision–recall curves, and the proposed ensemble's confusion matrix.
+The figure below is a vector summary recreated from the supplied project evaluation image. It illustrates model-score comparisons, ROC curves, precision–recall curves, and the proposed ensemble's confusion matrix. The vector chart is illustrative; use the original experiment output for exact curves and model scores.
 
-![Comparative evaluation of base classifiers and proposed ensemble](docs/model-evaluation.png)
+![Comparative evaluation of base classifiers and proposed ensemble](docs/model-evaluation.svg)
 
 ### Reading the charts
 
