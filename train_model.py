@@ -16,6 +16,7 @@ def main() -> None:
                         help="CSV containing V1-V28, Amount, and Class columns.")
     parser.add_argument("--model-path", type=str, default="ensemble_model.joblib")
     parser.add_argument("--scaler-path", type=str, default="scaler.joblib")
+    parser.add_argument("--threshold-path", type=str, default="threshold.joblib")
     parser.add_argument("--random-state", type=int, default=42)
     args = parser.parse_args()
 
@@ -25,11 +26,18 @@ def main() -> None:
 
     data = pd.read_csv(dataset_path)
     pipeline = train_pipeline(data, random_state=args.random_state)
-    save_artifacts(pipeline["model"], pipeline["scaler"], args.model_path, args.scaler_path)
+    save_artifacts(
+        pipeline["model"],
+        pipeline["scaler"],
+        args.model_path,
+        args.scaler_path,
+        threshold=pipeline["threshold"],
+        threshold_path=args.threshold_path,
+    )
 
     metrics = pipeline["metrics"]
     print("Training complete.")
-    print(f"Selected threshold (validation F1): {pipeline['threshold']:.4f}")
+    print(f"Saved threshold: {pipeline['threshold']:.4f}")
     print(f"Test precision: {metrics['precision']:.4f}")
     print(f"Test recall: {metrics['recall']:.4f}")
     print(f"Test ROC-AUC: {metrics['roc_auc']:.4f}")
