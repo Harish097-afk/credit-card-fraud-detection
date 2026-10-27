@@ -2,222 +2,225 @@
 
 A machine-learning project for identifying potentially fraudulent credit-card transactions. It combines imbalanced-data training, model comparison, threshold selection, evaluation metrics, and a Streamlit interface for single-transaction and batch predictions.
 
-> **Project status:** The repository includes the code, automated tests, and evaluation workflow. The chart below is the project-provided evaluation visualization. Re-run experiments with documented data and split settings before treating the displayed metrics as independently reproduced results or making production-performance claims.
+> **Project status:** This repository contains the training pipeline, application, automated tests, and evaluation utilities. Performance figures below are explicitly labelled as notebook-reported experiments. Re-run the current pipeline with recorded data, split, seed, and package versions before describing results as independently reproduced or production-ready.
 
 ## Contents
 
 - [Problem statement](#problem-statement)
 - [Dataset](#dataset)
-- [Approach](#approach)
-- [Evaluation results](#evaluation-results)
-- [Capacity-based priority review](#capacity-based-priority-review)
-- [Understanding the confusion matrix](#understanding-the-confusion-matrix)
+- [Methodology](#methodology)
+- [Model performance and comparison](#model-performance-and-comparison)
+- [Interactive charts](#interactive-charts)
+- [Research-paper comparison and proposed improvements](#research-paper-comparison-and-proposed-improvements)
+- [Capacity-based review prioritization](#capacity-based-review-prioritization)
 - [Repository structure](#repository-structure)
 - [Setup](#setup)
-- [Train the ensemble](#train-the-ensemble)
-- [Compare models](#compare-models)
+- [Train and evaluate](#train-and-evaluate)
 - [Run the Streamlit application](#run-the-streamlit-application)
-- [Run tests](#run-tests)
-- [Limitations and next steps](#limitations-and-next-steps)
+- [Tests and CI](#tests-and-ci)
+- [Limitations and future research](#limitations-and-future-research)
 - [References](#references)
 
 ## Problem statement
 
 Credit-card fraud detection is a binary classification problem:
 
-- **Legitimate transaction (\`Class = 0\`)** — a transaction not labelled as fraud.
-- **Fraudulent transaction (\`Class = 1\`)** — a transaction labelled as fraud.
+- **Legitimate transaction (`Class = 0`)** — a transaction not labelled as fraud.
+- **Fraudulent transaction (`Class = 1`)** — a transaction labelled as fraud.
 
-Fraud is rare compared with legitimate activity. A classifier can therefore achieve high overall accuracy by predicting almost every transaction as legitimate while still failing to detect fraud. This project emphasizes metrics that expose this trade-off, especially **recall, precision, area under the precision–recall curve (AUPRC), ROC-AUC, and false-positive/false-negative counts**.
+Fraud is rare compared with legitimate activity. A classifier can therefore achieve high overall accuracy by predicting almost every transaction as legitimate while still failing to detect fraud. This project emphasizes metrics that expose this trade-off, especially **recall, precision, Average Precision (AP/AUPRC), ROC-AUC, and false-positive/false-negative counts**.
 
 ## Dataset
 
-This project is designed for the public [MLG-ULB Credit Card Fraud Detection dataset on Kaggle](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud).
+This project uses the public [MLG-ULB Credit Card Fraud Detection dataset on Kaggle](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud).
 
-- Documented size: 284,807 transactions and 31 columns.
-- Target: \`Class\`, where 0 is legitimate and 1 is fraud.
-- Features: \`V1\`–\`V28\`, \`Time\`, \`Amount\`, and \`Class\`.
-- \`V1\`–\`V28\` are anonymized numerical features produced using PCA; their original feature meanings are not provided.
-- \`Time\` records elapsed seconds relative to the first transaction in the dataset.
-- \`Amount\` is the transaction amount.
+- **Documented size:** 284,807 transactions and 31 columns.
+- **Target:** `Class`, where 0 is legitimate and 1 is fraud.
+- **Features:** `V1`–`V28`, `Time`, `Amount`, and `Class`.
+- **Anonymized features:** `V1`–`V28` are transformed numerical features; their original business meanings are not supplied.
+- **Time:** elapsed seconds relative to the first transaction in the dataset.
+- **Amount:** transaction amount.
 
-The documented dataset contains 492 fraud cases (about 0.173% of all transactions), so class imbalance is substantial. The training code drops \`Time\` and uses \`V1\`–\`V28\` and \`Amount\` as model features.
+The dataset contains 492 fraud cases (about 0.173%), making class imbalance severe. The main training pipeline drops `Time` and uses `V1`–`V28` and `Amount` as model features.
 
-### Obtain the data
+Download `creditcard.csv` from Kaggle and keep it local. **Do not commit the raw dataset or trained model artifacts to GitHub.**
 
-Download the CSV from Kaggle and place it locally. The file is commonly named \`creditcard.csv\`.
+## Methodology
 
-**Do not commit the dataset CSV or trained model artifacts to GitHub.** Keep the large dataset on your machine and link to the Kaggle source instead.
+The current repository pipeline follows this process:
 
-## Approach
+1. **Validate data:** required columns, numeric features, finite values, and binary target labels are checked.
+2. **Stratified split:** data is divided into training, validation, and held-out test partitions (60% / 20% / 20% overall).
+3. **Scale Amount:** fit `StandardScaler` on training data only; reuse it for validation, test, and inference.
+4. **Address imbalance:** apply SMOTE to the training partition only. Validation and test data keep their original class distribution.
+5. **Train an ensemble:** soft voting combines Random Forest, LightGBM, and XGBoost.
+6. **Select threshold:** choose a decision threshold using validation probabilities, not the held-out test labels.
+7. **Evaluate:** report precision, recall, ROC-AUC, Average Precision, MCC, and confusion-matrix counts.
+8. **Serve predictions:** the Streamlit app supports single transactions and batch CSV files.
+9. **Prioritize review:** a separate policy can select the highest-risk percentage of rows for manual review.
 
-1. **Validate and prepare the data.** Check expected columns, numeric and finite values, and binary target labels.
-2. **Split the data.** The main training pipeline creates training, validation, and held-out test partitions with stratification.
-3. **Scale the amount.** Fit a \`StandardScaler\` on the training partition only and reuse it for validation, test, and inference.
-4. **Handle class imbalance.** Apply SMOTE to the training partition only. Validation and test partitions retain the original class distribution.
-5. **Train classifiers.** The main pipeline uses a soft-voting ensemble of Random Forest, LightGBM, and XGBoost. A separate script compares these models with Logistic Regression.
-6. **Choose a threshold.** Select a decision threshold using validation probabilities, rather than tuning it on the held-out test set.
-7. **Evaluate.** Report precision, recall, ROC-AUC, AUPRC, Matthews correlation coefficient (MCC), and confusion-matrix counts.
-8. **Serve predictions.** Use the Streamlit application for one transaction or a batch CSV file.
+### Why the split and SMOTE order matter
 
-### Why use a decision threshold?
+SMOTE must be applied **after** the split and only to training data. Oversampling before splitting can let synthetic or related samples influence evaluation and make the result overly optimistic. Keeping validation and test distributions unchanged better reflects the rare-fraud setting.
 
-A model estimates a fraud probability. A threshold converts that probability into a class prediction. Lowering the threshold usually catches more fraud but may increase false alarms; raising it may reduce false alarms but miss more fraud. The threshold should reflect the cost of missed fraud, the cost of investigating legitimate transactions, and operational capacity. Maximizing F1 is a useful baseline, not a universal business optimum.
+### Threshold versus review capacity
 
-## Evaluation results
+A **probability threshold** flags every row whose predicted probability is at least the chosen cutoff. **Review capacity** instead ranks a batch and selects the top-risk percentage. They are different policies: capacity controls workload and does not retrain or improve the underlying model.
 
-The figure below is a vector summary recreated from the supplied project evaluation image. It illustrates model-score comparisons, ROC curves, precision–recall curves, and the proposed ensemble's confusion matrix. The vector chart is illustrative; use the original experiment output for exact curves and model scores.
+## Model performance and comparison
 
-![Comparative evaluation of base classifiers and proposed ensemble](docs/model-evaluation.svg)
+The table below reports the project's supplied notebook experiment. The values are **not guaranteed to be reproduced by the current training script**; hardware, split, model configuration, and evaluation procedure must match for an exact comparison.
 
-### Reading the charts
+| Model | Average Precision (AP) ↑ | ROC-AUC ↑ | Reported prediction time ↓ |
+|---|---:|---:|---:|
+| **Proposed soft-voting ensemble** | **0.8514** | 0.9825 | 1.4253 s |
+| Random Forest | 0.8378 | **0.9826** | 0.7830 s |
+| XGBoost | 0.8027 | 0.9782 | **0.2038 s** |
+| LightGBM | 0.7792 | 0.9757 | 0.2954 s |
 
-- **Figure 1 — Metric comparison:** Compares displayed scores for Random Forest, LightGBM, XGBoost, and the proposed ensemble. Precision, recall, F1, ROC-AUC, and MCC measure different properties and are not interchangeable.
-- **Figure 2 — ROC curves:** Shows the true-positive rate against the false-positive rate at different thresholds. The diagonal represents random ranking; curves closer to the top-left generally indicate stronger discrimination. ROC-AUC summarizes ranking performance across thresholds.
-- **Figure 3 — Precision–recall curves:** Shows the trade-off between precision and recall. This is especially informative for a dataset with very few fraud cases. The chart labels the proposed ensemble's AUPRC as 0.8465.
-- **Figure 4 — Confusion matrix:** Shows counts for legitimate and fraudulent transactions at the chosen threshold.
+**Interpretation**
 
-### Confusion matrix shown in the supplied figure
+- The ensemble has the highest reported AP (0.8514), indicating the strongest precision–recall ranking of these four in this experiment.
+- Random Forest has a marginally higher ROC-AUC (0.9826 versus 0.9825), so the ensemble does **not** win every metric.
+- XGBoost has the lowest reported prediction time in this measurement. Latency depends on hardware, batch size, and measurement setup.
+- For an extremely imbalanced dataset, AP/precision–recall analysis and false-positive counts are important complements to ROC-AUC. Accuracy alone can be misleading.
 
-| Actual class | Predicted legitimate | Predicted fraud |
-|---|---:|---:|
-| Legitimate (0) | 56,672 (true negatives) | 192 (false positives) |
-| Fraud (1) | 10 (false negatives) | 88 (true positives) |
+### Interactive charts
 
-Based on these displayed counts:
+**[Open the interactive model comparison chart source](docs/model-comparison.html)**. It includes selectable Plotly charts for AP/ROC-AUC comparison, reported prediction time, and review-capacity trade-offs. GitHub's README renderer does not execute JavaScript embedded in Markdown; to interact with the standalone chart, download `docs/model-comparison.html` from the repository and open it in a browser with an internet connection.
 
-- **Recall:** 88 / (88 + 10) = approximately **89.8%**. The model identified 88 of the 98 fraud cases in this test set.
-- **Precision:** 88 / (88 + 192) = approximately **31.4%**. Of the 280 transactions flagged as fraud, 88 were labelled fraud in the dataset.
-- **False-positive rate among legitimate transactions:** 192 / (56,672 + 192) = approximately **0.34%**.
+## Research-paper comparison and proposed improvements
 
-These figures illustrate a practical trade-off: the displayed threshold catches most fraud cases but generates false alerts that may require review. The best threshold depends on the intended use case.
+### Reference paper
 
-**Reproducibility note:** The chart is included as supplied project material. Its evaluation split, random seed, model versions, and threshold-selection procedure should be recorded alongside the experiment. The metrics above are calculated from the confusion matrix shown in the image; they are not a guarantee of future performance. Regenerate the chart from the current code and dataset before presenting it as a final benchmark.
+Khalid, Owoh, Uthmani, Ashawa, Osamor, and Adejoh (2024), *Enhancing Credit Card Fraud Detection: An Ensemble Machine Learning Approach*, **Big Data and Cognitive Computing, 8(1), 6**. [Read the paper](https://www.mdpi.com/2504-2289/8/1/6) · [DOI](https://doi.org/10.3390/bdcc8010006).
 
-## Capacity-based priority review
+The paper studies an ensemble involving **SVM, KNN, Random Forest, Bagging, and Boosting**, and discusses both random under-sampling and SMOTE for class imbalance. Its reported evaluation uses its own dataset and experimental setup. The paper's scores should not be directly compared with this project's scores as if they came from the same test set.
 
-For batch CSVs, the Streamlit app supports two distinct policies:
+### What this project does differently
 
-- **Probability threshold:** flags every row whose predicted fraud probability meets or exceeds the selected cutoff.
-- **Top-risk review capacity:** ranks rows by predicted fraud probability and marks the highest-risk percentage for manual review (0.5%, 1%, 2%, 5%, or 10%).
+| Topic | Reference paper's described approach | This project's approach / extension |
+|---|---|---|
+| Learners | SVM, KNN, RF, Bagging, Boosting and proposed combinations | Soft voting of Random Forest, LightGBM and XGBoost |
+| Imbalance handling | Evaluates under-sampling and SMOTE variants | SMOTE is restricted to training partition; test distribution remains imbalanced |
+| Evaluation split | Paper describes an 80/20 train/test split for its experiment | Stratified train/validation/test split; validation supports threshold selection |
+| Decision threshold | Reports classifier metrics at its experimental decisions | Explicit validation-selected threshold, separated from final test evaluation |
+| Operational review | Primarily classifier-level evaluation | Additional top-risk review-capacity policy for a fixed investigation workload |
+| Input robustness | Research-method focus | Numeric/finite-value, schema, probability, threshold and capacity validation; automated tests and CI |
 
-A review priority is **not a confirmed fraud prediction**. Capacity-based review changes which transactions are sent to investigators; it does not retrain or improve the underlying model. The review percentage is a workload limit, not a probability threshold. Results depend on the data, model, and score ranking, and should be validated on a separate holdout or future transactions before operational use.
+These are **methodological and application extensions**, not proof that this project is universally better than the paper. The dataset, split protocol, class prevalence, metrics, and hardware differ. A fair claim of improvement requires reproducing both approaches on the same untouched test data with the same preprocessing and evaluation protocol.
 
-In a notebook experiment on the Kaggle dataset, the proposed ensemble reported test Average Precision of **0.8514** and ROC-AUC of **0.9825**. With the top **0.5%** of test transactions prioritized, the reported result was **88 of 99 frauds caught**, **197 false alarms**, **11 missed frauds**, **88.89% recall**, and **30.88% precision**. These are notebook-reported results and are not automatically reproduced by the repository training script; record the split, seed, package versions, and model artifact before treating them as a reproducible benchmark.
+### Research improvements worth testing next
+
+1. **Compare resampling strategies:** training-only SMOTE vs. class-weighted models vs. SMOTE-ENN; preserve the original validation/test distribution.
+2. **Use a cost- or capacity-aware threshold:** choose the threshold on validation data using an explicit false-negative/false-positive cost or investigator budget, rather than relying only on F1.
+3. **Probability calibration:** evaluate reliability curves and Brier score; calibration matters if risk scores are interpreted as probabilities.
+4. **Temporal validation and drift:** because transactions are time-dependent, train on earlier records and evaluate on later records; monitor performance as fraud patterns change.
+5. **Explainability:** investigate SHAP or permutation importance on validation data. Since `V1`–`V28` are anonymized, their explanations may not map directly to business concepts.
+6. **Efficiency benchmarking:** record training time, inference latency, memory, and throughput under a fixed hardware and batch-size protocol.
+7. **Statistical reliability:** repeat experiments with multiple seeds and report variability; avoid selecting a final method by a single split.
+8. **Ablation study:** compare individual models, soft voting, sampling strategy, threshold strategy, and review capacity separately to establish which component adds value.
+
+These are proposed experiments. They should not be described as completed results until run and recorded.
+
+## Capacity-based review prioritization
+
+The supplied notebook experiment reported the following results when transactions were ranked by predicted risk and the top percentage was sent for review:
+
+| Review capacity | Transactions reviewed | Fraud caught | False alarms | Fraud missed | Recall | Precision |
+|---:|---:|---:|---:|---:|---:|---:|
+| 0.5% | 285 | 88 | 197 | 11 | 88.89% | 30.88% |
+| 1% | 570 | 90 | 480 | 9 | 90.91% | 15.79% |
+| 2% | 1,140 | 91 | 1,049 | 8 | 91.92% | 7.98% |
+| 5% | 2,849 | 93 | 2,756 | 6 | 93.94% | 3.26% |
+| 10% | 5,697 | 95 | 5,602 | 4 | 95.96% | 1.67% |
+
+The reported test set had 99 frauds. Higher review capacity caught more fraud but also produced many more false alarms and lower precision. These values are from a notebook experiment and should be re-run before being treated as a reproducible benchmark.
+
+**Priority Review does not mean confirmed fraud.** It means a transaction has been selected for investigation. Capacity is a percentage of rows, not a probability threshold, and it does not alter the model itself.
 
 ## Repository structure
 
-\`\`\`text
+```text
 credit-card-fraud-detection/
-├── app.py                    # Streamlit single-transaction and batch UI
-├── fraud_detection.py        # Feature preparation, training, evaluation, artifacts
-├── review_policy.py          # Capacity-based risk-priority selection
-├── train_model.py            # Train ensemble and write evaluation_report.json
-├── compare_models.py         # Compare baseline models and voting ensemble
-├── requirements.txt          # Python dependencies
-├── tests/                    # Automated regression and smoke tests
+├── app.py
+├── fraud_detection.py
+├── review_policy.py
+├── train_model.py
+├── compare_models.py
+├── requirements.txt
+├── tests/
 ├── docs/
-│   └── model-evaluation.png  # Evaluation figure used in this README
-└── DATASET_EVALUATION.md     # Dataset evaluation workflow and notes
-\`\`\`
+│   └── model-comparison.html
+└── DATASET_EVALUATION.md
+```
 
 ## Setup
 
-Use a supported Python 3 version (Python 3.11 is used by the repository's CI workflow).
+Python 3.11 is used by the repository CI workflow. From the repository folder, install dependencies:
 
-1. Install Python from [python.org](https://www.python.org/downloads/) if it is not installed. On Windows, select the option to add Python to PATH if it appears.
-2. Open a terminal in the repository folder.
-3. Install dependencies:
-
-\`\`\`bash
+```bash
 python -m pip install -r requirements.txt
-\`\`\`
+```
 
-If \`python\` is not recognized on Windows, reopen the terminal after installation. Depending on the installation, \`py -m pip ...\` may also work.
+On Windows, `py -m pip install -r requirements.txt` may work if the `python` command is not available.
 
-## Train the ensemble
+## Train and evaluate
 
-With \`creditcard.csv\` in the repository folder, run:
+Place the downloaded dataset at `creditcard.csv`, then run:
 
-\`\`\`bash
+```bash
 python train_model.py --data-path creditcard.csv
-\`\`\`
-
-The script saves these files by default:
-
-- \`ensemble_model.joblib\` — trained ensemble model.
-- \`scaler.joblib\` — scaler fitted to the training partition.
-- \`threshold.joblib\` — validation-selected decision threshold.
-- \`evaluation_report.json\` — dataset summary, threshold, and held-out test metrics.
-
-You can override output paths, for example:
-
-\`\`\`bash
-python train_model.py --data-path data/creditcard.csv --report-path reports/evaluation_report.json
-\`\`\`
-
-Keep generated artifacts local unless you have a specific, appropriate reason to publish them. Model files may be large and are tied to the training data and package versions.
-
-## Compare models
-
-Run the comparison script to train Logistic Regression, Random Forest, LightGBM, XGBoost, and the soft-voting ensemble on shared data partitions:
-
-\`\`\`bash
 python compare_models.py --data-path creditcard.csv
-\`\`\`
+```
 
-It prints precision, recall, F1, AUPRC, ROC-AUC, false positives, and false negatives, and writes \`model_comparison.json\`. The decision threshold is selected on validation data, while metrics are reported on a held-out random test split.
-
-A high AUPRC or ROC-AUC alone does not choose the final model. Compare missed fraud cases and false alerts as well, and evaluate a chronological split before making deployment claims.
+The training script saves the ensemble, scaler, selected threshold, and `evaluation_report.json` by default. The comparison script evaluates Logistic Regression, Random Forest, LightGBM, XGBoost, and the soft-voting ensemble. Keep generated artifacts and the dataset out of version control.
 
 ## Run the Streamlit application
 
-After training the model artifacts, run:
+After training the artifacts:
 
-\`\`\`bash
+```bash
 streamlit run app.py
-\`\`\`
+```
 
-The application supports:
+The app supports:
+- **Single transaction:** enter `V1`–`V28` and transaction amount to receive a predicted class and risk score.
+- **Batch CSV:** upload rows with `V1`–`V28` and either raw `Amount` or pre-scaled `scaled_amount`.
+- **Probability threshold:** flag all rows meeting the selected probability cutoff.
+- **Top-risk review capacity:** prioritize the highest-risk 0.5%, 1%, 2%, 5%, or 10% of uploaded rows.
+- **CSV export:** download batch results with probability and review-priority fields.
 
-- **Single transaction:** enter feature values and get a predicted class and fraud probability.
-- **Batch CSV:** upload multiple transactions, view predictions, and download the result CSV.
-- **Configurable probability threshold:** flag transactions above a chosen cutoff.
-- **Capacity-based priority review:** rank the highest-risk transactions and prioritize a chosen review percentage.
+If raw `Amount` is supplied, the saved scaler transforms it. If `scaled_amount` is supplied, it is treated as already standardized. Do not pass both representations unless you have a deliberate reason and understand the app's input handling.
 
-Batch input should contain \`V1\`–\`V28\` and either raw \`Amount\` or an already standardized \`scaled_amount\`. If raw \`Amount\` is supplied, the saved training scaler is used. An already standardized amount is not scaled a second time. Follow the input requirements shown in the application.
+Artifact locations can be configured with `FRAUD_MODEL_PATH`, `FRAUD_SCALER_PATH`, and `FRAUD_THRESHOLD_PATH`.
 
-Artifact paths can be configured with environment variables:
+## Tests and CI
 
-- \`FRAUD_MODEL_PATH\`
-- \`FRAUD_SCALER_PATH\`
-- \`FRAUD_THRESHOLD_PATH\`
+Run the tests locally:
 
-## Run tests
-
-Install dependencies first, then run:
-
-\`\`\`bash
+```bash
 python -m pytest -q
-\`\`\`
+```
 
-The tests cover data preparation and validation, threshold handling, training/inference behavior on synthetic data, artifact loading, and a Streamlit UI smoke test. Synthetic tests help verify software behavior; they do not establish real-world fraud-detection performance.
+The GitHub Actions workflow runs tests on pushes and pull requests. The tests cover review-capacity selection, malformed inputs, data validation, threshold handling, artifact behavior, and app smoke behavior. Passing software tests establishes code behavior—not real-world fraud performance.
 
-## Limitations and next steps
+## Limitations and future research
 
-- **Anonymized features:** The meanings of \`V1\`–\`V28\` are not available, limiting feature-level explanation.
-- **Severe class imbalance:** Precision can be low even when recall and ROC-AUC look strong.
-- **Short time span:** The dataset covers roughly two days. A random split may not represent future transaction streams.
-- **Temporal validation:** Evaluate on later transactions than those used for training to test for time-related distribution changes.
-- **Threshold choice:** Select it based on the business costs of false negatives and false positives, not only F1.
-- **Calibration and drift:** Check probability calibration and monitor performance as transaction patterns change.
-- **Operational controls:** A real payment system would need secure data handling, latency/reliability testing, monitoring, human review, and a documented response process.
+- **Anonymized features:** meanings of `V1`–`V28` are not available.
+- **Class imbalance:** high ROC-AUC can coexist with low precision and substantial investigation workload.
+- **Temporal generalization:** the dataset covers a short period; random splits may not reflect future transaction streams.
+- **Threshold and calibration:** validation-selected thresholds and risk probabilities should be reassessed for deployment conditions.
+- **Concept drift:** fraud behavior can change over time.
+- **Operational controls:** production use requires security, privacy, monitoring, latency testing, human review, and incident handling.
 
-This is an educational machine-learning project, not a certified fraud-prevention service. Do not use it to make real financial decisions without rigorous independent validation and appropriate controls.
+This is an educational research project, not a certified fraud-prevention service. Do not use it for real financial decisions without independent validation and appropriate controls.
 
 ## References
 
-1. [Kaggle — Credit Card Fraud Detection (MLG-ULB)](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)
-2. [imbalanced-learn — SMOTE documentation](https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.SMOTE.html)
-3. [scikit-learn — Classification metrics](https://scikit-learn.org/stable/modules/model_evaluation.html)
-4. [Streamlit documentation](https://docs.streamlit.io/)
+1. Khalid, A. R., Owoh, N., Uthmani, O., Ashawa, M., Osamor, J., & Adejoh, J. (2024). **Enhancing Credit Card Fraud Detection: An Ensemble Machine Learning Approach.** *Big Data and Cognitive Computing, 8*(1), 6. [Full text](https://www.mdpi.com/2504-2289/8/1/6) · [DOI: 10.3390/bdcc8010006](https://doi.org/10.3390/bdcc8010006)
+2. MLG-ULB. **Credit Card Fraud Detection dataset.** [Kaggle dataset](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)
+3. Chawla, N. V., Bowyer, K. W., Hall, L. O., & Kegelmeyer, W. P. (2002). **SMOTE: Synthetic Minority Over-sampling Technique.** *Journal of Artificial Intelligence Research, 16*, 321–357. [Paper](https://doi.org/10.1613/jair.953)
+4. [imbalanced-learn — SMOTE documentation](https://imbalanced-learn.org/stable/references/generated/imblearn.over_sampling.SMOTE.html)
+5. [scikit-learn — Model evaluation and classification metrics](https://scikit-learn.org/stable/modules/model_evaluation.html)
+6. [Streamlit documentation](https://docs.streamlit.io/)
