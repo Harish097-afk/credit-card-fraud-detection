@@ -146,18 +146,48 @@ def evaluate_model(
     return _threshold_metrics(y_test, probabilities, threshold)
 
 
-def train_pipeline(frame: pd.DataFrame, random_state: int = 42) -> Dict[str, Any]:
-    """Train, tune threshold on validation data, and evaluate on held-out test data."""
+def _validate_training_data(frame: pd.DataFrame) -> Tuple[pd.DataFrame, pd.Series]:
+    """Validate schema, numeric features, finite values, and binary labels before splitting."""
     if TARGET_COLUMN not in frame.columns:
         raise ValueError(f"The dataset must contain the target column '{TARGET_COLUMN}'.")
 
     working = frame.copy()
-    if "Time" in working.columns:
-        working = working.drop(columns=["Time"])
-    X = working.drop(columns=[TARGET_COLUMN])
-    y = working[TARGET_COLUMN].astype(int)
-    if y.nunique() != 2:
-        raise ValueError("The target column must contain both classes.")
+    working = working.drop(columns=["Time"], errors="ignore")
+    _validate_required_columns(working)
+
+    if "scaled_amount" in working.columns and AMOUNT_COLUMN not in working.columns:
+        raise ValueError("Training data must contain raw 'Amount'; scaled_amount is inference-only.")
+    if AMOUNT_COLUMN not in working.columns:
+        raise ValueError("Training data must contain raw 'Amount'.")
+
+    feature_columns = FEATURE_COLUMNS + [AMOUNT_COLUMN]
+    for column in feature_columns:
+        try:
+            working[column] = pd.to_numeric(working[column], errors="raise")
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Training feature '{column}' must contain only numeric values.") from exc
+
+    feature_values = working[feature_columns].to_numpy(dtype=float)
+    if not np.isfinite(feature_values).all():
+        raise ValueError("Training features contain missing or infinite values; clean the dataset first.")
+
+    try:
+        numeric_target = pd.to_numeric(working[TARGET_COLUMN], errors="raise")
+    except (ValueError, TypeError) as exc:
+        raise ValueError("Target column 'Class' must contain only binary numeric labels 0 and 1.") from exc
+
+    if numeric_target.isna().any() or not np.isfinite(numeric_target.to_numpy(dtype=float)).all():
+        raise ValueError("Target column 'Class' contains missing or infinite labels.")
+    labels = set(numeric_target.unique().tolist())
+    if labels != {0, 1}:
+        raise ValueError("Target column 'Class' must contain both classes encoded exactly as 0 and 1.")
+
+    return working[feature_columns], numeric_target.astype(int)
+
+
+def train_pipeline(frame: pd.DataFrame, random_state: int = 42) -> Dict[str, Any]:
+    """Train, tune threshold on validation data, and evaluate on held-out test data."""
+    X, y = _validate_training_data(frame)
 
     X_train_val, X_test_raw, y_train_val, y_test = train_test_split(
         X, y, test_size=0.2, stratify=y, random_state=random_state
@@ -170,6 +200,14 @@ def train_pipeline(frame: pd.DataFrame, random_state: int = 42) -> Dict[str, Any
     X_train, scaler = prepare_training_frame(X_train_raw)
     X_val, _ = prepare_training_frame(X_val_raw, scaler=scaler)
     X_test, _ = prepare_training_frame(X_test_raw, scaler=scaler)
+
+    # SMOTE's default k_neighbors=5 requires at least six minority samples in training.
+    minority_count = int(y_train.value_counts().min())
+    if minority_count < 6:
+        raise ValueError(
+            "The training split must contain at least 6 examples from each class for SMOTE. "
+            "Provide more labeled fraud examples or use a different resampling strategy."
+        )
 
     # SMOTE is applied only to the training partition to avoid leakage.
     smote = SMOTE(random_state=random_state)
