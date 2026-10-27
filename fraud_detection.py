@@ -13,6 +13,7 @@ from sklearn.metrics import (
     average_precision_score,
     confusion_matrix,
     matthews_corrcoef,
+    precision_recall_curve,
     precision_score,
     recall_score,
     roc_auc_score,
@@ -36,16 +37,18 @@ def _validate_required_columns(frame: pd.DataFrame, *, for_inference: bool = Fal
         raise ValueError("The input data must contain an 'Amount' column or a 'scaled_amount' column.")
 
 
-def prepare_training_frame(frame: pd.DataFrame, scaler: Optional[StandardScaler] = None) -> Tuple[pd.DataFrame, Optional[StandardScaler]]:
-    """Prepare the training dataset by dropping unlabeled columns and scaling Amount."""
+def prepare_training_frame(
+    frame: pd.DataFrame, scaler: Optional[StandardScaler] = None
+) -> Tuple[pd.DataFrame, StandardScaler]:
+    """Drop non-features and standardize raw Amount using a train-fitted scaler."""
     working = frame.copy()
-    if TARGET_COLUMN in working.columns:
-        working = working.drop(columns=[TARGET_COLUMN])
-    if "Time" in working.columns:
-        working = working.drop(columns=["Time"])
-
+    working = working.drop(columns=[c for c in (TARGET_COLUMN, "Time") if c in working.columns])
     _validate_required_columns(working)
 
+    if AMOUNT_COLUMN not in working.columns:
+        raise ValueError("Training data must contain raw 'Amount'; scaled_amount is inference-only.")
+
+    working[AMOUNT_COLUMN] = pd.to_numeric(working[AMOUNT_COLUMN], errors="raise")
     if scaler is None:
         scaler = StandardScaler()
         working[AMOUNT_COLUMN] = scaler.fit_transform(working[[AMOUNT_COLUMN]]).ravel()
@@ -56,152 +59,168 @@ def prepare_training_frame(frame: pd.DataFrame, scaler: Optional[StandardScaler]
 
 
 def prepare_inference_frame(frame: pd.DataFrame, scaler: StandardScaler) -> pd.DataFrame:
-    """Return inference data with the exact schema used to train the ensemble."""
-    working = frame.copy()
-    if TARGET_COLUMN in working.columns:
-        working = working.drop(columns=[TARGET_COLUMN])
-    if "Time" in working.columns:
-        working = working.drop(columns=["Time"])
+    """Prepare inference features; do not scale an already-standardized scaled_amount twice.
 
+    If raw Amount is present, it is transformed with the training scaler. If only
+    scaled_amount is present, its values are treated as already standardized.
+    """
+    working = frame.copy()
+    working = working.drop(columns=[c for c in (TARGET_COLUMN, "Time") if c in working.columns])
     _validate_required_columns(working, for_inference=True)
 
-    if AMOUNT_COLUMN not in working.columns:
-        working[AMOUNT_COLUMN] = working["scaled_amount"]
+    if AMOUNT_COLUMN in working.columns:
+        raw_amount = pd.to_numeric(working[AMOUNT_COLUMN], errors="raise")
+        working[AMOUNT_COLUMN] = scaler.transform(raw_amount.to_frame()).ravel()
+    else:
+        working[AMOUNT_COLUMN] = pd.to_numeric(working["scaled_amount"], errors="raise")
 
-    working[AMOUNT_COLUMN] = scaler.transform(working[[AMOUNT_COLUMN]]).ravel()
-    return working[FEATURE_COLUMNS + [AMOUNT_COLUMN]]
+    prepared = working[FEATURE_COLUMNS + [AMOUNT_COLUMN]]
+    if not np.isfinite(prepared.to_numpy(dtype=float)).all():
+        raise ValueError("Inference features contain NaN or infinite values.")
+    return prepared
 
 
 def make_soft_voting_model() -> VotingClassifier:
-    """Create the soft-voting ensemble defined in the project specification."""
+    """Create the project's soft-voting ensemble."""
     rf_model = RandomForestClassifier(
-        n_estimators=100,
-        max_depth=12,
-        n_jobs=-1,
-        random_state=42,
+        n_estimators=100, max_depth=12, n_jobs=-1, random_state=42
     )
-
     lgbm_model = LGBMClassifier(
-        n_estimators=100,
-        learning_rate=0.05,
-        num_leaves=31,
-        objective="binary",
-        random_state=42,
-        n_jobs=-1,
+        n_estimators=100, learning_rate=0.05, num_leaves=31,
+        objective="binary", random_state=42, n_jobs=-1,
     )
-
     xgb_model = XGBClassifier(
-        n_estimators=100,
-        learning_rate=0.05,
-        max_depth=6,
-        objective="binary:logistic",
-        eval_metric="logloss",
-        random_state=42,
-        n_jobs=-1,
+        n_estimators=100, learning_rate=0.05, max_depth=6,
+        objective="binary:logistic", eval_metric="logloss",
+        random_state=42, n_jobs=-1,
     )
-
     return VotingClassifier(
-        estimators=[
-            ("rf", rf_model),
-            ("lgbm", lgbm_model),
-            ("xgb", xgb_model),
-        ],
+        estimators=[("rf", rf_model), ("lgbm", lgbm_model), ("xgb", xgb_model)],
         voting="soft",
     )
 
 
-def evaluate_model(model: VotingClassifier, X_test: pd.DataFrame, y_test: pd.Series) -> Dict[str, Any]:
-    """Compute the evaluation metrics requested for fraud detection benchmarking."""
-    probabilities = model.predict_proba(X_test)[:, 1]
-    predictions = (probabilities >= 0.5).astype(int)
-
-    metrics: Dict[str, Any] = {
-        "precision": float(precision_score(y_test, predictions, zero_division=0)),
-        "recall": float(recall_score(y_test, predictions, zero_division=0)),
-        "roc_auc": float(roc_auc_score(y_test, probabilities)),
-        "average_precision": float(average_precision_score(y_test, probabilities)),
-        "auprc": float(average_precision_score(y_test, probabilities)),
-        "mcc": float(matthews_corrcoef(y_test, predictions)),
-        "confusion_matrix": confusion_matrix(y_test, predictions).tolist(),
+def _threshold_metrics(
+    y_true: pd.Series, probabilities: np.ndarray, threshold: float
+) -> Dict[str, Any]:
+    predictions = (probabilities >= threshold).astype(int)
+    precision, recall, pr_thresholds = precision_recall_curve(y_true, probabilities)
+    return {
+        "threshold": float(threshold),
+        "precision": float(precision_score(y_true, predictions, zero_division=0)),
+        "recall": float(recall_score(y_true, predictions, zero_division=0)),
+        "roc_auc": float(roc_auc_score(y_true, probabilities)),
+        "average_precision": float(average_precision_score(y_true, probabilities)),
+        "auprc": float(average_precision_score(y_true, probabilities)),
+        "mcc": float(matthews_corrcoef(y_true, predictions)),
+        "confusion_matrix": confusion_matrix(y_true, predictions).tolist(),
+        "pr_curve": {
+            "precision": precision.astype(float).tolist(),
+            "recall": recall.astype(float).tolist(),
+            "thresholds": pr_thresholds.astype(float).tolist(),
+        },
     }
-    return metrics
+
+
+def select_threshold(y_true: pd.Series, probabilities: np.ndarray) -> float:
+    """Select the threshold maximizing F1 on validation data (never the final test set)."""
+    precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
+    if thresholds.size == 0:
+        return 0.5
+    denominator = precision[:-1] + recall[:-1]
+    f1 = np.divide(
+        2 * precision[:-1] * recall[:-1],
+        denominator,
+        out=np.zeros_like(denominator),
+        where=denominator != 0,
+    )
+    return float(thresholds[int(np.argmax(f1))])
+
+
+def evaluate_model(
+    model: VotingClassifier,
+    X_test: pd.DataFrame,
+    y_test: pd.Series,
+    threshold: float = 0.5,
+) -> Dict[str, Any]:
+    """Evaluate predictions at a chosen threshold and include precision-recall curve data."""
+    probabilities = model.predict_proba(X_test)[:, 1]
+    return _threshold_metrics(y_test, probabilities, threshold)
 
 
 def train_pipeline(frame: pd.DataFrame, random_state: int = 42) -> Dict[str, Any]:
-    """Train the full preprocessing + SMOTE + soft-voting ensemble pipeline."""
+    """Train on one split, tune threshold on validation, and evaluate once on held-out test data."""
     if TARGET_COLUMN not in frame.columns:
         raise ValueError(f"The dataset must contain the target column '{TARGET_COLUMN}'.")
 
     working = frame.copy()
     if "Time" in working.columns:
         working = working.drop(columns=["Time"])
-
     X = working.drop(columns=[TARGET_COLUMN])
     y = working[TARGET_COLUMN].astype(int)
+    if y.nunique() != 2:
+        raise ValueError("The target column must contain both classes.")
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
-        test_size=0.2,
-        stratify=y,
-        random_state=random_state,
+    X_train_val, X_test_raw, y_train_val, y_test = train_test_split(
+        X, y, test_size=0.2, stratify=y, random_state=random_state
+    )
+    X_train_raw, X_val_raw, y_train, y_val = train_test_split(
+        X_train_val, y_train_val, test_size=0.25,
+        stratify=y_train_val, random_state=random_state
     )
 
-    if np.unique(y_train).size < 2 or np.unique(y_test).size < 2:
-        raise ValueError("The target column must contain both classes in train and test splits.")
+    X_train, scaler = prepare_training_frame(X_train_raw)
+    X_val, _ = prepare_training_frame(X_val_raw, scaler=scaler)
+    X_test, _ = prepare_training_frame(X_test_raw, scaler=scaler)
 
-    X_train, scaler = prepare_training_frame(X_train, scaler=None)
-    X_test, _ = prepare_training_frame(X_test, scaler=scaler)
-
+    # Resampling is restricted to the training partition to avoid leakage.
     smote = SMOTE(random_state=random_state)
     X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train)
 
     ensemble_model = make_soft_voting_model()
     ensemble_model.fit(X_train_resampled, y_train_resampled)
 
-    metrics = evaluate_model(ensemble_model, X_test, y_test)
+    validation_probabilities = ensemble_model.predict_proba(X_val)[:, 1]
+    best_threshold = select_threshold(y_val, validation_probabilities)
+    validation_metrics = _threshold_metrics(y_val, validation_probabilities, best_threshold)
+    test_metrics = evaluate_model(ensemble_model, X_test, y_test, threshold=best_threshold)
+
     return {
         "model": ensemble_model,
         "scaler": scaler,
-        "metrics": metrics,
+        "threshold": best_threshold,
+        "validation_metrics": validation_metrics,
+        "metrics": test_metrics,
         "X_test": X_test,
         "y_test": y_test,
     }
 
 
-def save_artifacts(model: VotingClassifier, scaler: StandardScaler, model_path: str = "ensemble_model.joblib", scaler_path: str = "scaler.joblib") -> None:
+def save_artifacts(
+    model: VotingClassifier,
+    scaler: StandardScaler,
+    model_path: str = "ensemble_model.joblib",
+    scaler_path: str = "scaler.joblib",
+) -> None:
     joblib.dump(model, model_path)
     joblib.dump(scaler, scaler_path)
 
 
-def load_artifacts(model_path: str = "ensemble_model.joblib", scaler_path: str = "scaler.joblib") -> Tuple[Optional[Any], Optional[StandardScaler]]:
-    model_file = Path(model_path)
-    scaler_file = Path(scaler_path)
-
+def load_artifacts(
+    model_path: str = "ensemble_model.joblib", scaler_path: str = "scaler.joblib"
+) -> Tuple[Optional[Any], Optional[StandardScaler]]:
+    model_file, scaler_file = Path(model_path), Path(scaler_path)
     if not model_file.exists() or not scaler_file.exists():
         return None, None
-
-    model = joblib.load(model_file)
-    scaler = joblib.load(scaler_file)
-    return model, scaler
+    return joblib.load(model_file), joblib.load(scaler_file)
 
 
 __all__ = [
-    "AMOUNT_COLUMN",
-    "FEATURE_COLUMNS",
-    "TARGET_COLUMN",
-    "evaluate_model",
-    "load_artifacts",
-    "make_soft_voting_model",
-    "prepare_inference_frame",
-    "prepare_training_frame",
-    "save_artifacts",
-    "train_pipeline",
+    "AMOUNT_COLUMN", "FEATURE_COLUMNS", "TARGET_COLUMN", "evaluate_model",
+    "load_artifacts", "make_soft_voting_model", "prepare_inference_frame",
+    "prepare_training_frame", "save_artifacts", "select_threshold", "train_pipeline",
 ]
 
 
 if __name__ == "__main__":
-    print("fraud_detection.py - reusable training and inference pipeline for the credit-card fraud detection project.")
     print("Use train_model.py to train and export the ensemble model artifacts.")
-    
-    
