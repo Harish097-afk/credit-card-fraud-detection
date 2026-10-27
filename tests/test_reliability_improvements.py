@@ -116,6 +116,7 @@ def test_training_rejects_non_numeric_feature():
     from fraud_detection import _validate_training_data
 
     frame = _training_frame()
+    frame["V2"] = frame["V2"].astype(object)
     frame.loc[0, "V2"] = "bad-value"
     with pytest.raises(ValueError, match="V2.*numeric"):
         _validate_training_data(frame)
