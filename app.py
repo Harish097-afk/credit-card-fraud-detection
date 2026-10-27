@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 import streamlit as st
 
@@ -9,6 +11,10 @@ from fraud_detection import (
     prepare_inference_frame,
 )
 
+MODEL_PATH = os.getenv("FRAUD_MODEL_PATH", "ensemble_model.joblib")
+SCALER_PATH = os.getenv("FRAUD_SCALER_PATH", "scaler.joblib")
+THRESHOLD_PATH = os.getenv("FRAUD_THRESHOLD_PATH", "threshold.joblib")
+
 st.set_page_config(page_title="Credit Card Fraud Detection", layout="wide")
 st.title("💳 Credit Card Fraud Detection System")
 st.markdown("SMOTE + soft-voting ensemble for credit-card fraud classification.")
@@ -16,12 +22,12 @@ st.markdown("SMOTE + soft-voting ensemble for credit-card fraud classification."
 
 @st.cache_resource
 def load_model_and_scaler():
-    return load_artifacts("ensemble_model.joblib", "scaler.joblib")
+    return load_artifacts(MODEL_PATH, SCALER_PATH)
 
 
 @st.cache_data
 def get_default_threshold():
-    return load_threshold("threshold.joblib")
+    return load_threshold(THRESHOLD_PATH)
 
 
 model, scaler = load_model_and_scaler()
