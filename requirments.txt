@@ -1,0 +1,16 @@
+# Core data processing
+numpy
+pandas
+
+# Machine learning and class-imbalance handling
+scikit-learn
+imbalanced-learn
+lightgbm
+xgboost
+joblib
+
+# Web application
+streamlit
+
+# Tests
+pytest
