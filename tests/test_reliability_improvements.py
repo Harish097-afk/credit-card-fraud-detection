@@ -1,11 +1,15 @@
 import numpy as np
 import pandas as pd
+import pytest
 from sklearn.preprocessing import StandardScaler
 
 from fraud_detection import (
     AMOUNT_COLUMN,
     FEATURE_COLUMNS,
+    DEFAULT_THRESHOLD,
+    load_threshold,
     prepare_inference_frame,
+    save_artifacts,
     select_threshold,
 )
 
@@ -53,8 +57,37 @@ def test_inference_rejects_non_numeric_amount():
     scaler = StandardScaler().fit(pd.DataFrame({AMOUNT_COLUMN: [1.0, 2.0]}))
     data = _features(AMOUNT_COLUMN, ["not-a-number", "2.0"])
 
-    try:
+    with pytest.raises((ValueError, TypeError)):
         prepare_inference_frame(data, scaler)
-    except (ValueError, TypeError):
-        return
-    raise AssertionError("Expected invalid Amount values to be rejected")
+
+
+def test_missing_threshold_artifact_uses_backward_compatible_default(tmp_path):
+    assert load_threshold(str(tmp_path / "missing.joblib")) == DEFAULT_THRESHOLD
+
+
+def test_saved_threshold_round_trips_and_is_validated(tmp_path):
+    import joblib
+
+    threshold_path = tmp_path / "threshold.joblib"
+    joblib.dump(0.37, threshold_path)
+    assert load_threshold(str(threshold_path)) == pytest.approx(0.37)
+
+    joblib.dump(1.5, threshold_path)
+    with pytest.raises(ValueError, match="Invalid saved threshold"):
+        load_threshold(str(threshold_path))
+
+
+def test_save_artifacts_persists_threshold(tmp_path):
+    from sklearn.dummy import DummyClassifier
+
+    model = DummyClassifier(strategy="prior").fit([[0], [1]], [0, 1])
+    scaler = StandardScaler().fit([[0.0], [1.0]])
+    threshold_path = tmp_path / "threshold.joblib"
+    save_artifacts(
+        model, scaler,
+        model_path=str(tmp_path / "model.joblib"),
+        scaler_path=str(tmp_path / "scaler.joblib"),
+        threshold=0.42,
+        threshold_path=str(threshold_path),
+    )
+    assert load_threshold(str(threshold_path)) == pytest.approx(0.42)
