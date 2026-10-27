@@ -9,7 +9,8 @@ A machine-learning project for identifying potentially fraudulent credit-card tr
 - [Problem statement](#problem-statement)
 - [Dataset](#dataset)
 - [Approach](#approach)
-- [Evaluation results](#evaluation-results)\n- [Capacity-based priority review](#capacity-based-priority-review)
+- [Evaluation results](#evaluation-results)
+- [Capacity-based priority review](#capacity-based-priority-review)
 - [Understanding the confusion matrix](#understanding-the-confusion-matrix)
 - [Repository structure](#repository-structure)
 - [Setup](#setup)
@@ -109,7 +110,8 @@ In a notebook experiment on the Kaggle dataset, the proposed ensemble reported t
 \`\`\`text
 credit-card-fraud-detection/
 ├── app.py                    # Streamlit single-transaction and batch UI
-├── fraud_detection.py        # Feature preparation, training, evaluation, artifacts\n├── review_policy.py          # Capacity-based risk-priority selection
+├── fraud_detection.py        # Feature preparation, training, evaluation, artifacts
+├── review_policy.py          # Capacity-based risk-priority selection
 ├── train_model.py            # Train ensemble and write evaluation_report.json
 ├── compare_models.py         # Compare baseline models and voting ensemble
 ├── requirements.txt          # Python dependencies
@@ -180,7 +182,8 @@ The application supports:
 
 - **Single transaction:** enter feature values and get a predicted class and fraud probability.
 - **Batch CSV:** upload multiple transactions, view predictions, and download the result CSV.
-- **Configurable decision threshold:** adjust the threshold and observe how predictions change.
+- **Configurable probability threshold:** flag transactions above a chosen cutoff.
+- **Capacity-based priority review:** rank the highest-risk transactions and prioritize a chosen review percentage.
 
 Batch input should contain \`V1\`–\`V28\` and either raw \`Amount\` or an already standardized \`scaled_amount\`. If raw \`Amount\` is supplied, the saved training scaler is used. An already standardized amount is not scaled a second time. Follow the input requirements shown in the application.
 
