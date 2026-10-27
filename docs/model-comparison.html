@@ -2,35 +2,42 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Credit Card Fraud Detection — Interactive Model Comparison</title>
+<title>Credit Card Fraud Detection — Interactive Results</title>
 <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 <style>
-body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:1100px;margin:32px auto;padding:0 18px;line-height:1.55;color:#202124}
-.panel{border:1px solid #ddd;border-radius:12px;padding:16px;margin:18px 0}
-.note{background:#f7f7f7;padding:12px;border-radius:8px;font-size:.95rem}
-</style>
-</head>
-<body>
+body{font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem;color:#202124}
+.panel{border:1px solid #ddd;border-radius:12px;padding:14px;margin:18px 0}.note{background:#f7f7f7;padding:14px;border-radius:8px}
+table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #bbb;padding:.6rem;text-align:left}a{overflow-wrap:anywhere}
+</style></head><body>
 <h1>Interactive Model Performance Comparison</h1>
-<p>Project-reported test results for the Kaggle credit-card fraud dataset. Choose a metric from the chart controls to compare models. Hover over bars for exact values.</p>
-<div class="panel"><div id="performance" style="height:480px"></div></div>
-<div class="panel"><h2>Prediction latency</h2><div id="latency" style="height:360px"></div></div>
-<div class="panel"><h2>Top-risk review capacity experiment</h2><div id="capacity" style="height:390px"></div></div>
-<p class="note"><strong>Reproducibility note:</strong> These are results supplied from the project's notebook experiments, not a claim that the current repository pipeline has independently reproduced them. Average Precision (AP) is used as the primary ranking metric because fraud is rare. Model prediction times depend on hardware, batch size, and measurement method. Capacity results describe prioritization on the reported test split and are not a probability-threshold experiment.</p>
+<p>Explore the reported model-comparison experiment, prediction time, and the relationship between review capacity, recall, and precision. Hover over chart points for exact values.</p>
+<p class="note"><strong>Reproducibility:</strong> these values were supplied from project notebook experiments; this page does not run model training. Results may depend on data split, random seed, package versions, and hardware. They should not be interpreted as a direct head-to-head against published results from a different protocol.</p>
+<div class="panel"><div id="performance" style="height:470px"></div></div>
+<div class="panel"><div id="latency" style="height:350px"></div></div>
+<div class="panel"><div id="capacity" style="height:390px"></div></div>
+<h2>How the project extends the research workflow</h2>
+<table><thead><tr><th>Technique</th><th>Why it matters</th><th>Project status</th></tr></thead><tbody>
+<tr><td>Stratified train/validation/test split</td><td>Preserves rare fraud examples while keeping threshold selection separate from final test evaluation.</td><td>Implemented in training pipeline.</td></tr>
+<tr><td>SMOTE on training partition only</td><td>Addresses class imbalance while avoiding synthetic records in validation/test sets.</td><td>Implemented.</td></tr>
+<tr><td>Soft-voting ensemble: RF + LightGBM + XGBoost</td><td>Combines probability estimates from different tree-based learners.</td><td>Implemented and compared with base models.</td></tr>
+<tr><td>Validation-selected threshold</td><td>Separates score ranking from the class decision rule and avoids test-set threshold tuning.</td><td>Implemented; F1 is the current selection objective.</td></tr>
+<tr><td>Top-risk capacity review</td><td>Ranks transactions to match a review team's limited investigation capacity.</td><td>Implemented in batch UI; ranking is not a confirmed fraud label.</td></tr>
+<tr><td>Calibration and cost-sensitive thresholds</td><td>Could improve probability reliability and align decisions with false-positive/false-negative costs.</td><td>Recommended future experiments; not yet claimed as implemented.</td></tr>
+<tr><td>Chronological holdout and drift monitoring</td><td>Tests performance on later transactions and changing fraud patterns.</td><td>Recommended before any deployment claim.</td></tr>
+<tr><td>Paper-inspired model comparison</td><td>Compare SVM, KNN, RF, bagging, AdaBoost and voting under the same split, metrics, and evaluation policy.</td><td>Research direction; not a reproduction of the paper.</td></tr>
+</tbody></table>
+<p><strong>Reference:</strong> Khalid, A. R., Owoh, N., Uthmani, O., Ashawa, M., Osamor, J., &amp; Adejoh, J. (2024). “Enhancing Credit Card Fraud Detection: An Ensemble Machine Learning Approach.” <em>Big Data and Cognitive Computing</em>, 8(1), 6. <a href="https://doi.org/10.3390/bdcc8010006">https://doi.org/10.3390/bdcc8010006</a> · <a href="https://www.mdpi.com/2504-2289/8/1/6">Full text</a>.</p>
 <script>
 const models=['Proposed Ensemble','Random Forest','XGBoost','LightGBM'];
-const ap=[0.8514,0.8378,0.8027,0.7792];
-const roc=[0.9825,0.9826,0.9782,0.9757];
-const metrics=[
-{name:'Average Precision (AP)',x:models,y:ap,type:'bar',marker:{color:'#2878B5'},text:ap.map(v=>v.toFixed(4)),textposition:'outside'},
-{name:'ROC-AUC',x:models,y:roc,type:'bar',marker:{color:'#E07A3F'},text:roc.map(v=>v.toFixed(4)),textposition:'outside'}
-];
-Plotly.newPlot('performance',metrics,{barmode:'group',title:'Ranking performance (higher is better)',yaxis:{title:'Score',range:[0.72,1.02]},margin:{t:65,b:90},legend:{orientation:'h',y:1.15}},{responsive:true});
-Plotly.newPlot('latency',[{x:models,y:[1.4253,0.7830,0.2038,0.2954],type:'bar',text:['1.4253 s','0.7830 s','0.2038 s','0.2954 s'],textposition:'outside',marker:{color:'#4C956C'}}],{title:'Reported prediction time (lower is faster)',yaxis:{title:'Seconds',rangemode:'tozero'},margin:{t:60,b:90}},{responsive:true});
+const ap=[0.8514,0.8378,0.8027,0.7792], roc=[0.9825,0.9826,0.9782,0.9757];
+Plotly.newPlot('performance',[
+{x:models,y:ap,name:'Average Precision (AP)',type:'bar',text:ap.map(v=>v.toFixed(4)),textposition:'outside'},
+{x:models,y:roc,name:'ROC-AUC',type:'bar',text:roc.map(v=>v.toFixed(4)),textposition:'outside'}
+],{barmode:'group',title:'Reported test ranking metrics (higher is better)',yaxis:{title:'Score',range:[0.72,1.02]},margin:{t:70,b:90},legend:{orientation:'h',y:1.15}},{responsive:true});
+Plotly.newPlot('latency',[{x:models,y:[1.4253,0.7830,0.2038,0.2954],type:'bar',text:['1.4253 s','0.7830 s','0.2038 s','0.2954 s'],textposition:'outside'}],{title:'Reported prediction time (lower is faster)',yaxis:{title:'Seconds',rangemode:'tozero'},margin:{t:60,b:90}},{responsive:true});
 const cap=['0.5%','1%','2%','5%','10%'];
 Plotly.newPlot('capacity',[
-{x:cap,y:[88.89,90.91,91.92,93.94,95.96],name:'Recall (%)',type:'scatter',mode:'lines+markers',yaxis:'y'},
-{x:cap,y:[30.88,15.79,7.98,3.26,1.67],name:'Precision (%)',type:'scatter',mode:'lines+markers',yaxis:'y2'}
-],{title:'Recall and precision as review capacity increases',xaxis:{title:'Highest-risk transactions sent for review'},yaxis:{title:'Recall (%)',range:[80,100]},yaxis2:{title:'Precision (%)',overlaying:'y',side:'right',range:[0,35]},legend:{orientation:'h',y:1.12},margin:{t:70,b:75}},{responsive:true});
-</script>
-</body></html>
+{x:cap,y:[88.89,90.91,91.92,93.94,95.96],name:'Recall (%)',type:'scatter',mode:'lines+markers+text',text:['88.89%','90.91%','91.92%','93.94%','95.96%'],textposition:'top center',yaxis:'y'},
+{x:cap,y:[30.88,15.79,7.98,3.26,1.67],name:'Precision (%)',type:'scatter',mode:'lines+markers+text',text:['30.88%','15.79%','7.98%','3.26%','1.67%'],textposition:'bottom center',yaxis:'y2'}
+],{title:'Reported recall and precision versus review capacity',xaxis:{title:'Top-risk review capacity'},yaxis:{title:'Recall (%)',range:[80,100]},yaxis2:{title:'Precision (%)',overlaying:'y',side:'right',range:[0,35]},legend:{orientation:'h',y:1.15},margin:{t:70,b:70}},{responsive:true});
+</script></body></html>
