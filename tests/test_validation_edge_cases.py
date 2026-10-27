@@ -35,6 +35,7 @@ def test_prepare_training_frame_rejects_non_finite_values(bad_value):
 @pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf])
 def test_validate_training_data_rejects_non_finite_target(bad_value):
     frame = _frame()
+    frame["Class"] = frame["Class"].astype(float)
     frame.loc[0, "Class"] = bad_value
     with pytest.raises(ValueError, match="missing or infinite"):
         _validate_training_data(frame)
