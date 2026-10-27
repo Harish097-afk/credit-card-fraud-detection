@@ -1,67 +1,58 @@
-from __future__ import annotations
+# Credit Card Fraud Detection
 
-import numpy as np
-import pandas as pd
+A Streamlit application for credit-card transaction classification using a soft-voting ensemble of Random Forest, LightGBM, and XGBoost.
 
-from fraud_detection import (
-    AMOUNT_COLUMN,
-    FEATURE_COLUMNS,
-    make_soft_voting_model,
-    prepare_inference_frame,
-    train_pipeline,
-)
+## Features
 
+- Prepares the PCA features `V1`–`V28` and transaction amount.
+- Trains with SMOTE applied only to the training partition.
+- Selects a fraud decision threshold on a validation split, then evaluates on a held-out test split.
+- Reports precision, recall, ROC-AUC, average precision (AUPRC), Matthews correlation coefficient, confusion matrix, and precision-recall curve data.
+- Supports single-transaction and batch CSV inference.
+- Exports all batch predictions and probabilities to a downloadable CSV.
 
-def _make_synthetic_dataset(n_legit: int = 180, n_fraud: int = 20) -> pd.DataFrame:
-    rng = np.random.default_rng(42)
-    rows = []
+## Dataset
 
-    for _ in range(n_legit):
-        row = {f"V{i}": float(rng.normal(0, 1)) for i in range(1, 29)}
-        row[AMOUNT_COLUMN] = float(rng.uniform(1.0, 500.0))
-        row["Time"] = float(rng.uniform(0, 200000))
-        row["Class"] = 0
-        rows.append(row)
+Provide your own copy of the credit-card fraud dataset as a CSV with `V1` through `V28`, `Amount`, and `Class`. The target `Class` should use 0 for legitimate transactions and 1 for fraud. The optional `Time` column is dropped during training.
 
-    for _ in range(n_fraud):
-        row = {f"V{i}": float(rng.normal(1.5, 1.2)) for i in range(1, 29)}
-        row[AMOUNT_COLUMN] = float(rng.uniform(50.0, 1000.0))
-        row["Time"] = float(rng.uniform(0, 200000))
-        row["Class"] = 1
-        rows.append(row)
+Do not commit private transaction data or generated model artifacts to the repository.
 
-    return pd.DataFrame(rows)
+## Install
 
+Use Python 3.10 or newer, then install the dependencies listed in `requirements.txt`:
 
-def test_make_soft_voting_model_uses_soft_voting() -> None:
-    model = make_soft_voting_model()
-    assert model.voting == "soft"
-    assert len(model.estimators) == 3
+```bash
+python -m pip install -r requirements.txt
+```
 
+## Train
 
-def test_prepare_inference_frame_keeps_expected_schema() -> None:
-    data = pd.DataFrame({
-        **{feature: [0.1, -0.2] for feature in FEATURE_COLUMNS},
-        AMOUNT_COLUMN: [100.0, 50.0],
-    })
+```bash
+python train_model.py --data-path path/to/creditcard.csv
+```
 
-    scaler = __import__("sklearn.preprocessing").preprocessing.StandardScaler()
-    scaler.fit(data[[AMOUNT_COLUMN]])
+The command saves `ensemble_model.joblib` and `scaler.joblib` by default and prints the validation-selected threshold and held-out test metrics.
 
-    prepared = prepare_inference_frame(data, scaler)
-    assert prepared.columns.tolist() == FEATURE_COLUMNS + [AMOUNT_COLUMN]
-    assert prepared.shape == (2, 30)
-    assert np.isfinite(prepared.to_numpy()).all()
+## Run the web app
 
+```bash
+streamlit run app.py
+```
 
-def test_train_pipeline_runs_and_returns_metrics() -> None:
-    dataset = _make_synthetic_dataset()
-    result = train_pipeline(dataset, random_state=42)
+In Batch CSV Upload mode, upload a CSV containing `V1`–`V28` and either raw `Amount` or already-standardized `scaled_amount`. Raw `Amount` is standardized with the saved training scaler; `scaled_amount` is passed through without a second scaling step.
 
-    assert "model" in result
-    assert "scaler" in result
-    assert "metrics" in result
-    metric_keys = {"precision", "recall", "roc_auc", "average_precision", "auprc", "mcc", "confusion_matrix"}
-    assert metric_keys.issubset(result["metrics"].keys())
-    assert result["model"].voting == "soft"
-    assert len(result["model"].estimators) == 3
+The app displays a preview and provides **Download all predictions (CSV)**. The exported file includes the original input columns, `Fraud_Prediction`, `Fraud_Probability`, `Decision_Threshold`, and `Fraud_Label`.
+
+## Tests
+
+Run the tests after installing the dependencies:
+
+```bash
+pytest -q
+```
+
+The regression tests cover amount scaling, the already-scaled inference path, invalid numeric values, and validation-based threshold selection.
+
+## Threshold note
+
+The threshold is selected by maximizing F1 on validation data; it is not a universal business optimum. In real deployments, choose it based on the relative cost of missed fraud, false positives, and investigation capacity. Evaluate all reported test metrics on the held-out test set rather than using it to tune the threshold.

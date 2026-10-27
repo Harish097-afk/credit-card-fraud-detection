@@ -10,32 +10,13 @@ from fraud_detection import save_artifacts, train_pipeline
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Train the credit-card fraud detection soft-voting ensemble.",
+        description="Train the credit-card fraud detection soft-voting ensemble."
     )
-    parser.add_argument(
-        "--data-path",
-        type=str,
-        required=True,
-        help="Path to a CSV containing V1-V28, Amount, Time, and Class columns.",
-    )
-    parser.add_argument(
-        "--model-path",
-        type=str,
-        default="ensemble_model.joblib",
-        help="Output path for the trained ensemble model.",
-    )
-    parser.add_argument(
-        "--scaler-path",
-        type=str,
-        default="scaler.joblib",
-        help="Output path for the fitted StandardScaler.",
-    )
-    parser.add_argument(
-        "--random-state",
-        type=int,
-        default=42,
-        help="Random seed for reproducible training.",
-    )
+    parser.add_argument("--data-path", type=str, required=True,
+                        help="CSV containing V1-V28, Amount, and Class columns.")
+    parser.add_argument("--model-path", type=str, default="ensemble_model.joblib")
+    parser.add_argument("--scaler-path", type=str, default="scaler.joblib")
+    parser.add_argument("--random-state", type=int, default=42)
     args = parser.parse_args()
 
     dataset_path = Path(args.data_path)
@@ -48,12 +29,14 @@ def main() -> None:
 
     metrics = pipeline["metrics"]
     print("Training complete.")
-    print(f"Precision: {metrics['precision']:.4f}")
-    print(f"Recall: {metrics['recall']:.4f}")
-    print(f"ROC-AUC: {metrics['roc_auc']:.4f}")
-    print(f"AUPRC: {metrics['auprc']:.4f}")
-    print(f"MCC: {metrics['mcc']:.4f}")
-    print(f"Confusion matrix: {metrics['confusion_matrix']}")
+    print(f"Selected threshold (validation F1): {pipeline['threshold']:.4f}")
+    print(f"Test precision: {metrics['precision']:.4f}")
+    print(f"Test recall: {metrics['recall']:.4f}")
+    print(f"Test ROC-AUC: {metrics['roc_auc']:.4f}")
+    print(f"Test average precision / AUPRC: {metrics['auprc']:.4f}")
+    print(f"Test MCC: {metrics['mcc']:.4f}")
+    print(f"Test confusion matrix: {metrics['confusion_matrix']}")
+    print("Precision-recall curve arrays are available in pipeline['metrics']['pr_curve'].")
 
 
 if __name__ == "__main__":
