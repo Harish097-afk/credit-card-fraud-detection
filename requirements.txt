@@ -1,95 +1,16 @@
-from __future__ import annotations
+# Core data processing
+numpy
+pandas
 
-from pathlib import Path
+# Machine learning and class-imbalance handling
+scikit-learn
+imbalanced-learn
+lightgbm
+xgboost
+joblib
 
-import pandas as pd
+# Web application
+streamlit
 
-from fraud_detection import AMOUNT_COLUMN, FEATURE_COLUMNS, load_artifacts, prepare_inference_frame
-
-
-def main() -> None:
-    import streamlit as st
-
-    st.set_page_config(page_title="Credit Card Fraud Detection", layout="wide")
-    st.title("💳 Credit Card Fraud Detection System")
-    st.markdown("Replication of *Khalid et al. (2024)* — **SMOTE + Soft-Voting Ensemble Framework**")
-
-    @st.cache_resource
-    def load_model_and_scaler():
-        return load_artifacts("ensemble_model.joblib", "scaler.joblib")
-
-    model, scaler = load_model_and_scaler()
-
-    if model is None or scaler is None:
-        st.error(
-            "⚠️ Model artifacts missing. Train the model with `python train_model.py --data-path path/to/creditcard.csv`"
-        )
-        return
-
-    st.sidebar.header("Navigation")
-    mode = st.sidebar.radio("Select Input Mode", ["Single Transaction", "Batch CSV Upload"])
-    fraud_threshold = st.sidebar.slider(
-        "Fraud Probability Threshold",
-        min_value=0.10,
-        max_value=0.95,
-        value=0.50,
-        step=0.01,
-    )
-
-    if mode == "Single Transaction":
-        st.subheader("⚙️ Single Transaction Predictor")
-        col_left, col_right = st.columns(2)
-
-        with col_left:
-            amount = st.number_input("Transaction Amount ($)", min_value=0.0, value=150.0, step=0.01)
-
-        with col_right:
-            st.info("Features V1 to V28 default to 0.0 for testing; the amount is standardized using the saved scaler.")
-
-        feature_inputs = {
-            feature: st.number_input(feature, value=0.0, step=0.001, format="%.6f")
-            for feature in FEATURE_COLUMNS
-        }
-
-        if st.button("Analyze Transaction", type="primary"):
-            row = {AMOUNT_COLUMN: amount, **feature_inputs}
-            prepared = prepare_inference_frame(pd.DataFrame([row]), scaler)
-            probability = model.predict_proba(prepared)[0, 1]
-            prediction = int(probability >= fraud_threshold)
-
-            if prediction == 1:
-                st.error(f"🚨 FRAUD DETECTED — Fraud probability: {probability * 100:.2f}%")
-            else:
-                st.success(f"✅ LEGITIMATE TRANSACTION — Fraud probability: {probability * 100:.2f}%")
-
-            st.caption(f"Decision threshold: {fraud_threshold:.2f}")
-
-    else:
-        st.subheader("📁 Batch File Inference")
-        uploaded_file = st.file_uploader("Upload a CSV containing V1-V28 and Amount", type=["csv"])
-
-        if uploaded_file is not None:
-            data = pd.read_csv(uploaded_file)
-            st.write("Uploaded sample preview:", data.head(3))
-
-            required_columns = FEATURE_COLUMNS + [AMOUNT_COLUMN]
-            missing_columns = [column for column in required_columns if column not in data.columns]
-            if missing_columns:
-                st.error(f"The uploaded CSV is missing required columns: {missing_columns}")
-            else:
-                if st.button("Run Predictions", type="primary"):
-                    processed = prepare_inference_frame(data, scaler)
-                    probabilities = model.predict_proba(processed)[:, 1]
-                    predictions = (probabilities >= fraud_threshold).astype(int)
-
-                    result = data.copy()
-                    result["Fraud_Prediction"] = predictions
-                    result["Fraud_Probability"] = probabilities
-
-                    st.success("Analysis complete.")
-                    st.dataframe(result[["Fraud_Prediction", "Fraud_Probability"]].head(10), use_container_width=True)
-                    st.metric("Total Flagged Frauds", int((predictions == 1).sum()))
-
-
-if __name__ == "__main__":
-    main()
+# Tests
+pytest
