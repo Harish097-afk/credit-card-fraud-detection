@@ -5,6 +5,7 @@ from fraud_detection import (
     AMOUNT_COLUMN,
     FEATURE_COLUMNS,
     load_artifacts,
+    load_threshold,
     prepare_inference_frame,
 )
 
@@ -18,6 +19,11 @@ def load_model_and_scaler():
     return load_artifacts("ensemble_model.joblib", "scaler.joblib")
 
 
+@st.cache_data
+def get_default_threshold():
+    return load_threshold("threshold.joblib")
+
+
 model, scaler = load_model_and_scaler()
 
 if model is None or scaler is None:
@@ -26,12 +32,13 @@ if model is None or scaler is None:
         "`python train_model.py --data-path path/to/creditcard.csv`"
     )
 else:
+    default_threshold = get_default_threshold()
     st.sidebar.header("Navigation")
     mode = st.sidebar.radio("Select Input Mode", ["Single Transaction", "Batch CSV Upload"])
     fraud_threshold = st.sidebar.slider(
         "Fraud Probability Threshold", min_value=0.01, max_value=0.99,
-        value=0.50, step=0.01,
-        help="Lower thresholds usually flag more transactions and may increase false positives.",
+        value=min(0.99, max(0.01, default_threshold)), step=0.01,
+        help="Defaults to the threshold selected on validation data. Adjust it to trade off missed fraud against false positives.",
     )
 
     if mode == "Single Transaction":
