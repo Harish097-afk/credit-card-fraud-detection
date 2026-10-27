@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="850" viewBox="0 0 1400 850">
+<rect width="1400" height="850" fill="#ffffff"/>
+<g font-family="Arial,Helvetica,sans-serif" fill="#111827">
+<text x="350" y="38" text-anchor="middle" font-size="24" font-weight="700">Figure 1: Comparative Evaluation</text>
+<text x="1050" y="38" text-anchor="middle" font-size="24" font-weight="700">Figure 2: ROC Curves</text>
+<text x="350" y="448" text-anchor="middle" font-size="24" font-weight="700">Figure 3: Precision–Recall Curves</text>
+<text x="1050" y="448" text-anchor="middle" font-size="24" font-weight="700">Figure 4: Confusion Matrix — Proposed Ensemble</text>
+</g>
+<g stroke="#cbd5e1" stroke-dasharray="5 5" fill="none">
+<path d="M80 100H650 M80 160H650 M80 220H650 M80 280H650 M80 340H650"/>
+<path d="M760 100H1340 M760 160H1340 M760 220H1340 M760 280H1340 M760 340H1340"/>
+<path d="M80 510H650 M80 570H650 M80 630H650 M80 690H650 M80 750H650"/>
+</g>
+<g stroke="#334155" fill="none" stroke-width="1.5"><path d="M80 90V360H650 M760 90V360H1340 M80 500V770H650 M760 500V770H1340"/></g>
+<g font-family="Arial" font-size="15" fill="#334155">
+<text x="75" y="365" text-anchor="end">0.60</text><text x="75" y="285" text-anchor="end">0.70</text><text x="75" y="225" text-anchor="end">0.80</text><text x="75" y="165" text-anchor="end">0.90</text><text x="75" y="105" text-anchor="end">1.00</text>
+<text x="165" y="385">Precision</text><text x="275" y="385">Recall</text><text x="395" y="385">F1</text><text x="500" y="385">ROC-AUC</text><text x="600" y="385">MCC</text>
+<text x="1045" y="390" text-anchor="middle">False Positive Rate</text><text x="350" y="800" text-anchor="middle">Recall</text>
+</g>
+<g fill="#28649a"><rect x="130" y="180" width="28" height="180"/><rect x="255" y="155" width="28" height="205"/><rect x="380" y="190" width="28" height="170"/><rect x="505" y="105" width="28" height="255"/><rect x="600" y="280" width="28" height="80"/></g>
+<g fill="#5a9bc0"><rect x="160" y="170" width="28" height="190"/><rect x="285" y="135" width="28" height="225"/><rect x="410" y="185" width="28" height="175"/><rect x="535" y="100" width="28" height="260"/><rect x="630" y="270" width="20" height="90"/></g>
+<g fill="none" stroke-width="3"><path d="M760 350 L790 150 L820 130 L900 115 L1020 108 L1160 103 L1340 100" stroke="#2563eb"/><path d="M760 350 L790 145 L825 125 L910 112 L1040 105 L1210 100 L1340 100" stroke="#f97316"/><path d="M760 350 L790 155 L830 128 L930 116 L1050 112 L1190 105 L1340 100" stroke="#16a34a"/><path d="M760 350 L790 142 L820 120 L900 108 L1040 102 L1200 100 L1340 100" stroke="#dc2626"/><path d="M760 350L1340 100" stroke="#111827" stroke-dasharray="8 6"/></g>
+<g fill="none" stroke-width="3"><path d="M80 510 L150 510 L230 525 L310 540 L390 560 L470 590 L530 640 L570 700 L610 745 L650 765" stroke="#2563eb"/><path d="M80 510 L170 520 L260 535 L350 560 L440 585 L520 620 L570 650 L610 730 L650 765" stroke="#f97316"/><path d="M80 510 L220 510 L320 520 L420 525 L500 560 L550 620 L590 700 L625 750 L650 765" stroke="#16a34a"/><path d="M80 510 L220 510 L330 510 L430 510 L500 535 L550 600 L590 680 L620 740 L650 765" stroke="#dc2626"/></g>
+<g font-family="Arial" font-size="18" fill="#334155"><text x="785" y="530">Actual legitimate (0)</text><text x="785" y="695">Actual fraud (1)</text><text x="1040" y="795" text-anchor="middle">Predicted label</text></g>
+<rect x="760" y="550" width="290" height="100" fill="#123d78"/><rect x="1050" y="550" width="290" height="100" fill="#eff6ff"/><rect x="760" y="650" width="290" height="100" fill="#eff6ff"/><rect x="1050" y="650" width="290" height="100" fill="#eff6ff"/>
+<g font-family="Arial" font-size="30" font-weight="700" text-anchor="middle"><text x="905" y="610" fill="#ffffff">56,672</text><text x="1195" y="610" fill="#111827">192</text><text x="905" y="710" fill="#111827">10</text><text x="1195" y="710" fill="#111827">88</text></g>
+<g font-family="Arial" font-size="16" fill="#475569"><text x="700" y="835" text-anchor="middle">Vector summary recreated from the supplied evaluation figure; consult the report for exact metrics.</text></g>
+</svg>
