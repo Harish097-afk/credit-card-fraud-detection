@@ -49,7 +49,16 @@ def prepare_training_frame(
     if AMOUNT_COLUMN not in working.columns:
         raise ValueError("Training data must contain raw 'Amount'; scaled_amount is inference-only.")
 
-    working[AMOUNT_COLUMN] = pd.to_numeric(working[AMOUNT_COLUMN], errors="raise")
+    for column in FEATURE_COLUMNS + [AMOUNT_COLUMN]:
+        try:
+            working[column] = pd.to_numeric(working[column], errors="raise")
+        except (ValueError, TypeError) as exc:
+            raise ValueError(f"Training feature '{column}' must contain only numeric values.") from exc
+
+    feature_values = working[FEATURE_COLUMNS + [AMOUNT_COLUMN]].to_numpy(dtype=float)
+    if not np.isfinite(feature_values).all():
+        raise ValueError("Training features contain NaN or infinite values.")
+
     if scaler is None:
         scaler = StandardScaler()
         working[AMOUNT_COLUMN] = scaler.fit_transform(working[[AMOUNT_COLUMN]]).ravel()
@@ -97,9 +106,39 @@ def make_soft_voting_model() -> VotingClassifier:
     )
 
 
+def _validate_probabilities(probabilities: np.ndarray) -> np.ndarray:
+    """Return a validated one-dimensional array of probability scores."""
+    scores = np.asarray(probabilities, dtype=float)
+    if scores.ndim != 1:
+        raise ValueError("Probabilities must be a one-dimensional array.")
+    if not np.isfinite(scores).all():
+        raise ValueError("Probabilities must contain only finite values.")
+    if ((scores < 0) | (scores > 1)).any():
+        raise ValueError("Probabilities must be between 0 and 1.")
+    return scores
+
+
+def _validate_threshold(threshold: float) -> float:
+    """Validate a probability decision threshold."""
+    try:
+        value = float(threshold)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("threshold must be a finite number between 0 and 1.") from exc
+    if not np.isfinite(value) or not 0.0 <= value <= 1.0:
+        raise ValueError("threshold must be a finite number between 0 and 1.")
+    return value
+
+
 def _threshold_metrics(
     y_true: pd.Series, probabilities: np.ndarray, threshold: float
 ) -> Dict[str, Any]:
+    probabilities = _validate_probabilities(probabilities)
+    threshold = _validate_threshold(threshold)
+    y_values = np.asarray(y_true)
+    if y_values.ndim != 1 or len(y_values) != len(probabilities):
+        raise ValueError("y_true and probabilities must be one-dimensional and have equal lengths.")
+    if set(np.unique(y_values).tolist()) != {0, 1}:
+        raise ValueError("y_true must contain both binary labels 0 and 1.")
     predictions = (probabilities >= threshold).astype(int)
     precision, recall, pr_thresholds = precision_recall_curve(y_true, probabilities)
     average_precision = float(average_precision_score(y_true, probabilities))
@@ -122,7 +161,13 @@ def _threshold_metrics(
 
 def select_threshold(y_true: pd.Series, probabilities: np.ndarray) -> float:
     """Select the threshold maximizing F1 on validation data."""
-    precision, recall, thresholds = precision_recall_curve(y_true, probabilities)
+    probabilities = _validate_probabilities(probabilities)
+    y_values = np.asarray(y_true)
+    if y_values.ndim != 1 or len(y_values) != len(probabilities):
+        raise ValueError("y_true and probabilities must be one-dimensional and have equal lengths.")
+    if set(np.unique(y_values).tolist()) != {0, 1}:
+        raise ValueError("y_true must contain both binary labels 0 and 1.")
+    precision, recall, thresholds = precision_recall_curve(y_values, probabilities)
     if thresholds.size == 0:
         return DEFAULT_THRESHOLD
     denominator = precision[:-1] + recall[:-1]
@@ -241,12 +286,16 @@ def save_artifacts(
     threshold_path: str = "threshold.joblib",
 ) -> None:
     """Save model/scaler and, when supplied, the validation-selected threshold."""
+    validated_threshold = None if threshold is None else _validate_threshold(threshold)
+    for output_path in (model_path, scaler_path):
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+    if validated_threshold is not None:
+        Path(threshold_path).parent.mkdir(parents=True, exist_ok=True)
+
     joblib.dump(model, model_path)
     joblib.dump(scaler, scaler_path)
-    if threshold is not None:
-        if not 0.0 <= float(threshold) <= 1.0:
-            raise ValueError("threshold must be between 0 and 1.")
-        joblib.dump(float(threshold), threshold_path)
+    if validated_threshold is not None:
+        joblib.dump(validated_threshold, threshold_path)
 
 
 def load_threshold(threshold_path: str = "threshold.joblib") -> float:
