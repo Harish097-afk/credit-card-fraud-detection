@@ -1,9 +1,0 @@
-streamlit>=1.38.0
-pandas>=2.2.0
-numpy>=1.26.0
-scikit-learn>=1.4.0
-xgboost>=2.1.0
-lightgbm>=4.3.0
-joblib>=1.4.0
-imbalanced-learn>=0.12.0
-pytest>=8.0.0
