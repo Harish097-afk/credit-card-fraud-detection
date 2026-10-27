@@ -91,3 +91,60 @@ def test_save_artifacts_persists_threshold(tmp_path):
         threshold_path=str(threshold_path),
     )
     assert load_threshold(str(threshold_path)) == pytest.approx(0.42)
+
+
+def _training_frame(rows=80, fraud_count=20):
+    rng = np.random.default_rng(7)
+    frame = pd.DataFrame(
+        rng.normal(size=(rows, len(FEATURE_COLUMNS))),
+        columns=FEATURE_COLUMNS,
+    )
+    frame[AMOUNT_COLUMN] = rng.uniform(1, 500, size=rows)
+    frame["Class"] = [1] * fraud_count + [0] * (rows - fraud_count)
+    return frame
+
+
+def test_training_rejects_missing_required_feature():
+    from fraud_detection import _validate_training_data
+
+    frame = _training_frame().drop(columns=["V7"])
+    with pytest.raises(ValueError, match="V7"):
+        _validate_training_data(frame)
+
+
+def test_training_rejects_non_numeric_feature():
+    from fraud_detection import _validate_training_data
+
+    frame = _training_frame()
+    frame.loc[0, "V2"] = "bad-value"
+    with pytest.raises(ValueError, match="V2.*numeric"):
+        _validate_training_data(frame)
+
+
+@pytest.mark.parametrize("bad_value", [np.nan, np.inf, -np.inf])
+def test_training_rejects_non_finite_features(bad_value):
+    from fraud_detection import _validate_training_data
+
+    frame = _training_frame()
+    frame.loc[0, "Amount"] = bad_value
+    with pytest.raises(ValueError, match="missing or infinite"):
+        _validate_training_data(frame)
+
+
+@pytest.mark.parametrize("labels", [[0, 2], [0, 0], ["fraud", "legit"]])
+def test_training_rejects_invalid_target_labels(labels):
+    from fraud_detection import _validate_training_data
+
+    frame = _training_frame()
+    frame["Class"] = [labels[i % len(labels)] for i in range(len(frame))]
+    with pytest.raises(ValueError, match="Class"):
+        _validate_training_data(frame)
+
+
+def test_training_rejects_pre_scaled_amount_column():
+    from fraud_detection import _validate_training_data
+
+    frame = _training_frame().drop(columns=["Amount"])
+    frame["scaled_amount"] = 0.0
+    with pytest.raises(ValueError, match="raw 'Amount'"):
+        _validate_training_data(frame)
