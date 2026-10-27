@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Credit Card Fraud Detection — Interactive Model Comparison</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,sans-serif;max-width:1100px;margin:32px auto;padding:0 18px;line-height:1.55;color:#202124}
+.panel{border:1px solid #ddd;border-radius:12px;padding:16px;margin:18px 0}
+.note{background:#f7f7f7;padding:12px;border-radius:8px;font-size:.95rem}
+</style>
+</head>
+<body>
+<h1>Interactive Model Performance Comparison</h1>
+<p>Project-reported test results for the Kaggle credit-card fraud dataset. Choose a metric from the chart controls to compare models. Hover over bars for exact values.</p>
+<div class="panel"><div id="performance" style="height:480px"></div></div>
+<div class="panel"><h2>Prediction latency</h2><div id="latency" style="height:360px"></div></div>
+<div class="panel"><h2>Top-risk review capacity experiment</h2><div id="capacity" style="height:390px"></div></div>
+<p class="note"><strong>Reproducibility note:</strong> These are results supplied from the project's notebook experiments, not a claim that the current repository pipeline has independently reproduced them. Average Precision (AP) is used as the primary ranking metric because fraud is rare. Model prediction times depend on hardware, batch size, and measurement method. Capacity results describe prioritization on the reported test split and are not a probability-threshold experiment.</p>
+<script>
+const models=['Proposed Ensemble','Random Forest','XGBoost','LightGBM'];
+const ap=[0.8514,0.8378,0.8027,0.7792];
+const roc=[0.9825,0.9826,0.9782,0.9757];
+const metrics=[
+{name:'Average Precision (AP)',x:models,y:ap,type:'bar',marker:{color:'#2878B5'},text:ap.map(v=>v.toFixed(4)),textposition:'outside'},
+{name:'ROC-AUC',x:models,y:roc,type:'bar',marker:{color:'#E07A3F'},text:roc.map(v=>v.toFixed(4)),textposition:'outside'}
+];
+Plotly.newPlot('performance',metrics,{barmode:'group',title:'Ranking performance (higher is better)',yaxis:{title:'Score',range:[0.72,1.02]},margin:{t:65,b:90},legend:{orientation:'h',y:1.15}},{responsive:true});
+Plotly.newPlot('latency',[{x:models,y:[1.4253,0.7830,0.2038,0.2954],type:'bar',text:['1.4253 s','0.7830 s','0.2038 s','0.2954 s'],textposition:'outside',marker:{color:'#4C956C'}}],{title:'Reported prediction time (lower is faster)',yaxis:{title:'Seconds',rangemode:'tozero'},margin:{t:60,b:90}},{responsive:true});
+const cap=['0.5%','1%','2%','5%','10%'];
+Plotly.newPlot('capacity',[
+{x:cap,y:[88.89,90.91,91.92,93.94,95.96],name:'Recall (%)',type:'scatter',mode:'lines+markers',yaxis:'y'},
+{x:cap,y:[30.88,15.79,7.98,3.26,1.67],name:'Precision (%)',type:'scatter',mode:'lines+markers',yaxis:'y2'}
+],{title:'Recall and precision as review capacity increases',xaxis:{title:'Highest-risk transactions sent for review'},yaxis:{title:'Recall (%)',range:[80,100]},yaxis2:{title:'Precision (%)',overlaying:'y',side:'right',range:[0,35]},legend:{orientation:'h',y:1.12},margin:{t:70,b:75}},{responsive:true});
+</script>
+</body></html>
