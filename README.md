@@ -186,6 +186,59 @@ Optional artifact path environment variables:
 - `FRAUD_SCALER_PATH`
 - `FRAUD_THRESHOLD_PATH`
 
+## Neo-brutalist React frontend (optional)
+
+The repository now includes an alternative **React + Vite** frontend with a neo-brutalist visual style: warm cream surfaces, signal-yellow accents, bold borders, offset shadows, responsive layouts, model metrics, transaction analysis, and a batch-review workspace. The original Streamlit interface remains available in `app.py`.
+
+The React frontend calls the FastAPI backend in `api.py`; predictions still come from the existing Python ensemble and saved model/scaler artifacts. The dashboard's benchmark cards show the previously reported notebook experiment metrics and are labelled as reported results, not live measurements.
+
+### 1. Install Python dependencies and train/load artifacts
+
+```bash
+python -m pip install -r requirements.txt
+python train_model.py --data-path path/to/creditcard.csv
+```
+
+If you already have compatible artifacts (`ensemble_model.joblib`, `scaler.joblib`, and optionally `threshold.joblib`), use their configured paths instead. Do not commit the dataset or model artifacts.
+
+### 2. Start the API
+
+From the repository root:
+
+```bash
+uvicorn api:app --reload --port 8000
+```
+
+API health check: [http://localhost:8000/health](http://localhost:8000/health). Interactive API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
+
+### 3. Start the React frontend
+
+Open a second terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open the local URL printed by Vite (normally [http://localhost:5173](http://localhost:5173)). By default, the frontend connects to `http://localhost:8000`. To use a different API URL, create `frontend/.env` with:
+
+```text
+VITE_API_URL=http://localhost:8000
+```
+
+Set `FRAUDWATCH_CORS_ORIGINS` on the backend if the frontend is hosted on a different origin. For example, set it to a comma-separated list of explicitly trusted frontend origins.
+
+### 4. Existing Streamlit UI
+
+The original app is still available:
+
+```bash
+streamlit run app.py
+```
+
+The React interface is an optional frontend, not a replacement for the Python model pipeline. The API requires local model/scaler artifacts before prediction endpoints can return results.
+
 ## Tests
 
 ```bash
