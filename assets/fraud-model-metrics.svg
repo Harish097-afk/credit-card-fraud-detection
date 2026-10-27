@@ -1,0 +1,165 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="900" viewBox="0 0 1400 900" role="img" aria-labelledby="title desc">
+  <title id="title">Credit Card Fraud Detection model evaluation summary</title>
+  <desc id="desc">Two by two grid of charts showing model scores, ROC curves, precision-recall curves, and confusion matrix.</desc>
+
+  <defs>
+    <style>
+      .figure { font: 700 18px 'Arial', sans-serif; fill: #111827; }
+      .axis { font: 12px 'Arial', sans-serif; fill: #374151; }
+      .legend { font: 12px 'Arial', sans-serif; fill: #111827; }
+      .grid { stroke: #d7dce2; stroke-width: 1; }
+      .axis-line { stroke: #374151; stroke-width: 1.2; }
+      .bar1 { fill: #1f78b4; opacity: 0.75; }
+      .bar2 { fill: #4a90c2; opacity: 0.8; }
+      .bar3 { fill: #95c1d7; opacity: 0.9; }
+      .roc1 { stroke: #1f77b4; stroke-width: 2.5; fill: none; }
+      .roc2 { stroke: #ff7f0e; stroke-width: 2.5; fill: none; }
+      .roc3 { stroke: #2ca02c; stroke-width: 2.5; fill: none; }
+      .roc4 { stroke: #d62728; stroke-width: 2.5; fill: none; }
+      .diag { stroke: #111827; stroke-width: 1.5; stroke-dasharray: 8 6; }
+      .cm-label { font: 700 18px 'Arial', sans-serif; fill: #111827; }
+      .cm-text { font: 700 30px 'Arial', sans-serif; fill: #0f172a; }
+    </style>
+  </defs>
+
+  <rect width="1400" height="900" fill="#f7f7f7"/>
+
+  <g transform="translate(60,70)">
+    <text x="260" y="0" class="figure">Figure 1: Comparative Evaluation of Base vs. Ensemble Model</text>
+    <g transform="translate(0,40)">
+      <rect x="0" y="0" width="560" height="330" fill="#f7f7f7"/>
+      <g class="grid">
+        <line x1="60" y1="20" x2="520" y2="20"/>
+        <line x1="60" y1="70" x2="520" y2="70"/>
+        <line x1="60" y1="120" x2="520" y2="120"/>
+        <line x1="60" y1="170" x2="520" y2="170"/>
+        <line x1="60" y1="220" x2="520" y2="220"/>
+        <line x1="60" y1="270" x2="520" y2="270"/>
+        <line x1="60" y1="320" x2="520" y2="320"/>
+      </g>
+      <g class="axis-line">
+        <line x1="60" y1="20" x2="60" y2="320"/>
+        <line x1="60" y1="320" x2="520" y2="320"/>
+      </g>
+      <text x="18" y="324" class="axis">0.0</text>
+      <text x="18" y="270" class="axis">0.2</text>
+      <text x="18" y="220" class="axis">0.4</text>
+      <text x="18" y="170" class="axis">0.6</text>
+      <text x="18" y="120" class="axis">0.8</text>
+      <text x="18" y="70" class="axis">1.0</text>
+      <text x="105" y="345" class="axis">Precision</text>
+      <text x="185" y="345" class="axis">Recall</text>
+      <text x="260" y="345" class="axis">F1-Score</text>
+      <text x="345" y="345" class="axis">ROC-AUC</text>
+      <text x="445" y="345" class="axis">MCC</text>
+
+      <g>
+        <rect x="88" y="170" width="30" height="150" class="bar1"/>
+        <rect x="110" y="144" width="30" height="176" class="bar2"/>
+        <rect x="165" y="180" width="30" height="140" class="bar1"/>
+        <rect x="188" y="134" width="30" height="186" class="bar2"/>
+        <rect x="242" y="200" width="30" height="120" class="bar1"/>
+        <rect x="264" y="150" width="30" height="170" class="bar2"/>
+        <rect x="320" y="170" width="30" height="150" class="bar1"/>
+        <rect x="342" y="95" width="30" height="225" class="bar2"/>
+        <rect x="400" y="230" width="30" height="90" class="bar1"/>
+        <rect x="430" y="200" width="30" height="120" class="bar2"/>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(700,70)">
+    <text x="170" y="0" class="figure">Figure 2: Receiver Operating Characteristic (ROC) Curves</text>
+    <g transform="translate(0,40)">
+      <rect x="0" y="0" width="560" height="330" fill="#f7f7f7"/>
+      <g class="grid">
+        <line x1="60" y1="20" x2="520" y2="20"/>
+        <line x1="60" y1="70" x2="520" y2="70"/>
+        <line x1="60" y1="120" x2="520" y2="120"/>
+        <line x1="60" y1="170" x2="520" y2="170"/>
+        <line x1="60" y1="220" x2="520" y2="220"/>
+        <line x1="60" y1="270" x2="520" y2="270"/>
+        <line x1="60" y1="320" x2="520" y2="320"/>
+      </g>
+      <line x1="60" y1="20" x2="60" y2="320" class="axis-line"/>
+      <line x1="60" y1="320" x2="520" y2="320" class="axis-line"/>
+      <line x1="60" y1="320" x2="520" y2="20" class="diag"/>
+
+      <path d="M60 320 L110 292 L145 270 L170 250 L195 230 L220 208 L245 188 L270 170 L295 146 L320 126 L350 96 L390 72 L440 46 L520 20" class="roc1"/>
+      <path d="M60 320 L103 285 L130 248 L165 220 L198 196 L236 172 L275 150 L315 128 L370 99 L440 72 L520 40" class="roc2"/>
+      <path d="M60 320 L111 287 L148 258 L185 229 L220 201 L254 172 L288 146 L325 120 L370 88 L440 62 L520 32" class="roc3"/>
+      <path d="M60 320 L108 286 L144 257 L182 228 L220 198 L255 170 L295 141 L335 112 L382 80 L440 54 L520 22" class="roc4"/>
+
+      <text x="250" y="360" class="axis">False Positive Rate</text>
+      <text x="-205" y="-18" transform="rotate(-90 -205 -18)" class="axis">True Positive Rate (Recall)</text>
+      <g transform="translate(250,20)">
+        <line x1="0" y1="0" x2="18" y2="0" class="roc1"/>
+        <text x="24" y="5" class="legend">Random Forest (AUC = 0.9793)</text>
+        <line x1="0" y1="18" x2="18" y2="18" class="roc2"/>
+        <text x="24" y="23" class="legend">LightGBM (AUC = 0.9820)</text>
+        <line x1="0" y1="36" x2="18" y2="36" class="roc3"/>
+        <text x="24" y="41" class="legend">XGBoost (AUC = 0.9716)</text>
+        <line x1="0" y1="54" x2="18" y2="54" class="roc4"/>
+        <text x="24" y="59" class="legend">Proposed Ensemble (AUC = 0.9809)</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(60,470)">
+    <text x="230" y="0" class="figure">Figure 3: Precision-Recall Curves (Key Imbalance Metric)</text>
+    <g transform="translate(0,40)">
+      <rect x="0" y="0" width="560" height="330" fill="#f7f7f7"/>
+      <g class="grid">
+        <line x1="60" y1="20" x2="520" y2="20"/>
+        <line x1="60" y1="80" x2="520" y2="80"/>
+        <line x1="60" y1="140" x2="520" y2="140"/>
+        <line x1="60" y1="200" x2="520" y2="200"/>
+        <line x1="60" y1="260" x2="520" y2="260"/>
+        <line x1="60" y1="320" x2="520" y2="320"/>
+      </g>
+      <line x1="60" y1="20" x2="60" y2="320" class="axis-line"/>
+      <line x1="60" y1="320" x2="520" y2="320" class="axis-line"/>
+
+      <path d="M60 320 L80 210 L110 186 L148 170 L190 146 L227 129 L262 118 L295 105 L338 90 L380 76 L420 55 L455 43 L520 20" class="roc1"/>
+      <path d="M60 320 L82 218 L118 193 L152 178 L188 161 L225 143 L260 130 L305 118 L345 104 L390 90 L440 70 L520 45" class="roc2"/>
+      <path d="M60 320 L85 245 L115 225 L150 205 L188 180 L222 160 L260 138 L300 120 L345 108 L400 92 L520 70" class="roc3"/>
+      <path d="M60 320 L82 215 L116 192 L150 176 L188 162 L225 148 L260 136 L300 121 L350 105 L420 90 L520 72" class="roc4"/>
+
+      <text x="240" y="360" class="axis">Recall</text>
+      <text x="-165" y="-18" transform="rotate(-90 -165 -18)" class="axis">Precision</text>
+      <g transform="translate(70,18)">
+        <line x1="0" y1="0" x2="18" y2="0" class="roc1"/>
+        <text x="24" y="5" class="legend">Random Forest (AUPRC = 0.8338)</text>
+        <line x1="0" y1="18" x2="18" y2="18" class="roc2"/>
+        <text x="24" y="23" class="legend">LightGBM (AUPRC = 0.7852)</text>
+        <line x1="0" y1="36" x2="18" y2="36" class="roc3"/>
+        <text x="24" y="41" class="legend">XGBoost (AUPRC = 0.8304)</text>
+        <line x1="0" y1="54" x2="18" y2="54" class="roc4"/>
+        <text x="24" y="59" class="legend">Proposed Ensemble (AUPRC = 0.8465)</text>
+      </g>
+    </g>
+  </g>
+
+  <g transform="translate(700,470)">
+    <text x="176" y="0" class="figure">Figure 4: Confusion Matrix - Proposed Ensemble Model</text>
+    <g transform="translate(0,40)">
+      <rect x="0" y="0" width="560" height="330" fill="#f3f4f6"/>
+      <rect x="140" y="40" width="280" height="210" fill="#0b2d63" opacity="0.92"/>
+
+      <line x1="140" y1="145" x2="420" y2="145" stroke="#dfeaf7" stroke-width="2"/>
+      <line x1="280" y1="40" x2="280" y2="250" stroke="#dfeaf7" stroke-width="2"/>
+
+      <text x="175" y="118" class="cm-text">56672</text>
+      <text x="330" y="118" class="cm-text">192</text>
+      <text x="175" y="212" class="cm-text">10</text>
+      <text x="335" y="212" class="cm-text">88</text>
+
+      <text x="100" y="34" class="cm-label" transform="rotate(-90 100 34)">True Label</text>
+      <text x="275" y="280" class="cm-label">Predicted Label</text>
+      <text x="178" y="306" class="cm-label">Legitimate</text>
+      <text x="338" y="306" class="cm-label">Fraud</text>
+      <text x="60" y="118" class="cm-label" transform="rotate(-90 60 118)">Legitimate</text>
+      <text x="60" y="212" class="cm-label" transform="rotate(-90 60 212)">Fraud</text>
+    </g>
+  </g>
+</svg>
