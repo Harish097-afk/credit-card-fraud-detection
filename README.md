@@ -9,7 +9,7 @@ A machine-learning project for identifying potentially fraudulent credit-card tr
 - [Problem statement](#problem-statement)
 - [Dataset](#dataset)
 - [Approach](#approach)
-- [Evaluation results](#evaluation-results)
+- [Evaluation results](#evaluation-results)\n- [Capacity-based priority review](#capacity-based-priority-review)
 - [Understanding the confusion matrix](#understanding-the-confusion-matrix)
 - [Repository structure](#repository-structure)
 - [Setup](#setup)
@@ -93,12 +93,23 @@ These figures illustrate a practical trade-off: the displayed threshold catches 
 
 **Reproducibility note:** The chart is included as supplied project material. Its evaluation split, random seed, model versions, and threshold-selection procedure should be recorded alongside the experiment. The metrics above are calculated from the confusion matrix shown in the image; they are not a guarantee of future performance. Regenerate the chart from the current code and dataset before presenting it as a final benchmark.
 
+## Capacity-based priority review
+
+For batch CSVs, the Streamlit app supports two distinct policies:
+
+- **Probability threshold:** flags every row whose predicted fraud probability meets or exceeds the selected cutoff.
+- **Top-risk review capacity:** ranks rows by predicted fraud probability and marks the highest-risk percentage for manual review (0.5%, 1%, 2%, 5%, or 10%).
+
+A review priority is **not a confirmed fraud prediction**. Capacity-based review changes which transactions are sent to investigators; it does not retrain or improve the underlying model. The review percentage is a workload limit, not a probability threshold. Results depend on the data, model, and score ranking, and should be validated on a separate holdout or future transactions before operational use.
+
+In a notebook experiment on the Kaggle dataset, the proposed ensemble reported test Average Precision of **0.8514** and ROC-AUC of **0.9825**. With the top **0.5%** of test transactions prioritized, the reported result was **88 of 99 frauds caught**, **197 false alarms**, **11 missed frauds**, **88.89% recall**, and **30.88% precision**. These are notebook-reported results and are not automatically reproduced by the repository training script; record the split, seed, package versions, and model artifact before treating them as a reproducible benchmark.
+
 ## Repository structure
 
 \`\`\`text
 credit-card-fraud-detection/
 ├── app.py                    # Streamlit single-transaction and batch UI
-├── fraud_detection.py        # Feature preparation, training, evaluation, artifacts
+├── fraud_detection.py        # Feature preparation, training, evaluation, artifacts\n├── review_policy.py          # Capacity-based risk-priority selection
 ├── train_model.py            # Train ensemble and write evaluation_report.json
 ├── compare_models.py         # Compare baseline models and voting ensemble
 ├── requirements.txt          # Python dependencies
