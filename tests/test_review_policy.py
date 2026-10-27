@@ -30,3 +30,24 @@ def test_rejects_invalid_probabilities():
 
 def test_empty_input_returns_empty_mask():
     assert prioritize_reviews([], 0.5).size == 0
+
+@pytest.mark.parametrize("capacity", [None, "bad", float("inf"), float("-inf")])
+def test_rejects_non_numeric_or_non_finite_capacity(capacity):
+    with pytest.raises(ValueError, match="capacity_percent"):
+        prioritize_reviews([0.1, 0.9], capacity)
+
+
+@pytest.mark.parametrize("scores", [[[0.1, 0.9]], [[0.1], [0.9]], ["bad", 0.9]])
+def test_rejects_malformed_probability_inputs(scores):
+    with pytest.raises(ValueError):
+        prioritize_reviews(scores, 50)
+
+
+def test_equal_scores_have_stable_input_order():
+    selected = prioritize_reviews([0.5, 0.5, 0.5, 0.1], 50)
+    assert selected.tolist() == [True, True, False, False]
+
+
+def test_full_capacity_selects_every_row():
+    assert prioritize_reviews([0.1, 0.9, 0.4], 100).tolist() == [True, True, True]
+
