@@ -11,9 +11,13 @@ A Streamlit application for credit-card transaction classification using a soft-
 - Supports single-transaction and batch CSV inference.
 - Exports all batch predictions and probabilities to a downloadable CSV.
 
+## Model performance
+
+![Credit Card Fraud detection model evaluation summary](assets/fraud-model-metrics.svg)
+
 ## Dataset
 
-Provide your own copy of the credit-card fraud dataset as a CSV with `V1` through `V28`, `Amount`, and `Class`. The target `Class` should use 0 for legitimate transactions and 1 for fraud. The optional `Time` column is dropped during training.
+Provide your own copy of the credit-card fraud dataset as a CSV with `V1` through `V28`, `Amount`, and `Class`. The target `Class` should use 0 for legitimate transactions and 1 for fraud. The optional `scaled_amount` column is accepted for pre-scaled inference.
 
 Do not commit private transaction data or generated model artifacts to the repository.
 
@@ -41,7 +45,7 @@ streamlit run app.py
 
 In Batch CSV Upload mode, upload a CSV containing `V1`–`V28` and either raw `Amount` or already-standardized `scaled_amount`. Raw `Amount` is standardized with the saved training scaler; `scaled_amount` is passed through without a second scaling step.
 
-The app displays a preview and provides **Download all predictions (CSV)**. The exported file includes the original input columns, `Fraud_Prediction`, `Fraud_Probability`, `Decision_Threshold`, and `Fraud_Label`.
+The app displays a preview and provides Download all predictions (CSV). The exported file includes the original input columns, `Fraud_Prediction`, `Fraud_Probability`, `Decision_Threshold`, and `Fraud_Label`.
 
 ## Tests
 
@@ -55,4 +59,4 @@ The regression tests cover amount scaling, the already-scaled inference path, in
 
 ## Threshold note
 
-The threshold is selected by maximizing F1 on validation data; it is not a universal business optimum. In real deployments, choose it based on the relative cost of missed fraud, false positives, and investigation capacity. Evaluate all reported test metrics on the held-out test set rather than using it to tune the threshold.
+The threshold is selected by maximizing F1 on validation data; it is not a universal business optimum. In real deployments, choose it based on the relative cost of missed fraud, false positives, and investigative capacity. Evaluate all reported test metrics on the held-out test set rather than using it to tune the threshold.
