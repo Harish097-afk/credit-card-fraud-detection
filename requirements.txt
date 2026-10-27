@@ -9,8 +9,12 @@ lightgbm
 xgboost
 joblib
 
-# Web application
+# Existing Streamlit interface and React API backend
 streamlit
+fastapi
+uvicorn[standard]
+pydantic
 
 # Tests
 pytest
+httpx
