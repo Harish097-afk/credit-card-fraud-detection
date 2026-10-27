@@ -1,79 +1,90 @@
-import streamlit as st
 import pandas as pd
-import numpy as np
-import joblib
-import os
+import streamlit as st
+
+from fraud_detection import AMOUNT_COLUMN, FEATURE_COLUMNS, load_artifacts, prepare_inference_frame
 
 st.set_page_config(page_title="Credit Card Fraud Detection", layout="wide")
-
 st.title("💳 Credit Card Fraud Detection System")
 st.markdown("Replication of *Khalid et al. (2024)* — **SMOTE + Soft-Voting Ensemble Framework**")
 
+
 @st.cache_resource
-def load_models():
-    if os.path.exists("ensemble_model.joblib") and os.path.exists("scaler.joblib"):
-        model = joblib.load("ensemble_model.joblib")
-        scaler = joblib.load("scaler.joblib")
-        return model, scaler
-    return None, None
+def load_model_and_scaler():
+    model, scaler = load_artifacts("ensemble_model.joblib", "scaler.joblib")
+    return model, scaler
 
-model, scaler = load_models()
 
-if model is None:
-    st.error("⚠️ Model artifacts missing. Upload 'ensemble_model.joblib' and 'scaler.joblib' to the repository.")
+model, scaler = load_model_and_scaler()
+
+if model is None or scaler is None:
+    st.error(
+        "⚠️ Model artifacts missing. Train the model with: `python train_model.py --data-path path/to/creditcard.csv`"
+    )
 else:
     st.sidebar.header("Navigation")
     mode = st.sidebar.radio("Select Input Mode", ["Single Transaction", "Batch CSV Upload"])
+    fraud_threshold = st.sidebar.slider(
+        "Fraud Probability Threshold",
+        min_value=0.10,
+        max_value=0.95,
+        value=0.50,
+        step=0.01,
+    )
 
     if mode == "Single Transaction":
         st.subheader("⚙️ Single Transaction Predictor")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            amount = st.number_input("Transaction Amount ($)", min_value=0.0, value=150.0)
-        with col2:
-            st.info("Features V1 to V28 default to 0.0 for testing.")
+        col_left, col_right = st.columns(2)
 
-        v_features = {f"V{i}": 0.0 for i in range(1, 29)}
+        with col_left:
+            amount = st.number_input("Transaction Amount ($)", min_value=0.0, value=150.0, step=0.01)
 
-        if st.button("Analyze Transaction"):
-            scaled_amt = scaler.transform([[amount]])[0][0]
-            input_dict = {**v_features, 'scaled_amount': scaled_amt}
-            input_df = pd.DataFrame([input_dict])
+        with col_right:
+            st.info("Features V1 to V28 are supplied directly, and the amount is standardized using the saved scaler.")
 
-            pred = model.predict(input_df)[0]
-            prob = model.predict_proba(input_df)[0][1]
+        feature_inputs = {
+            feature: st.number_input(feature, value=0.0, step=0.001, format="%.6f")
+            for feature in FEATURE_COLUMNS
+        }
 
-            if pred == 1:
-                st.error(f"🚨 **FRAUD DETECTED!** Probability: {prob * 100:.2f}%")
+        if st.button("Analyze Transaction", type="primary"):
+            row = {AMOUNT_COLUMN: amount, **feature_inputs}
+            prepared = prepare_inference_frame(pd.DataFrame([row]), scaler)
+            probability = model.predict_proba(prepared)[0, 1]
+            prediction = int(probability >= fraud_threshold)
+
+            if prediction == 1:
+                st.error(f"🚨 FRAUD DETECTED — Fraud probability: {probability * 100:.2f}%")
             else:
-                st.success(f"✅ **LEGITIMATE TRANSACTION.** Fraud Probability: {prob * 100:.2f}%")
+                st.success(f"✅ LEGITIMATE TRANSACTION — Fraud probability: {probability * 100:.2f}%")
+
+            st.caption(f"Decision threshold: {fraud_threshold:.2f}")
 
     elif mode == "Batch CSV Upload":
         st.subheader("📁 Batch File Inference")
-        uploaded_file = st.file_uploader("Upload CSV containing V1-V28 and Amount", type=["csv"])
+        uploaded_file = st.file_uploader("Upload a CSV containing V1-V28 and Amount", type=["csv"])
 
         if uploaded_file is not None:
             data = pd.read_csv(uploaded_file)
-            st.write("Uploaded Sample Preview:", data.head(3))
+            st.write("Uploaded sample preview:", data.head(3))
 
-            if st.button("Run Predictions"):
-                df_proc = data.copy()
-                if 'Amount' in df_proc.columns:
-                    df_proc['scaled_amount'] = scaler.transform(df_proc['Amount'].values.reshape(-1, 1))
-                    df_proc.drop(['Amount', 'Time'], axis=1, errors='ignore', inplace=True)
-                
-                if 'Class' in df_proc.columns:
-                    X_eval = df_proc.drop('Class', axis=1)
-                else:
-                    X_eval = df_proc
+            required_columns = FEATURE_COLUMNS + [AMOUNT_COLUMN]
+            missing_columns = [column for column in required_columns if column not in data.columns]
 
-                preds = model.predict(X_eval)
-                probs = model.predict_proba(X_eval)[:, 1]
+            if missing_columns:
+                st.error(f"The uploaded CSV is missing required columns: {missing_columns}")
+            else:
+                if st.button("Run Predictions", type="primary"):
+                    try:
+                        eval_frame = prepare_inference_frame(data, scaler)
+                        probabilities = model.predict_proba(eval_frame)[:, 1]
+                        predictions = (probabilities >= fraud_threshold).astype(int)
 
-                data['Fraud_Prediction'] = preds
-                data['Fraud_Probability'] = probs
+                        result = data.copy()
+                        result["Fraud_Prediction"] = predictions
+                        result["Fraud_Probability"] = probabilities
 
-                st.success("Analysis Complete!")
-                st.write(data[['Fraud_Prediction', 'Fraud_Probability']].head(10))
-                st.metric("Total Flagged Frauds", int(np.sum(preds == 1)))
+                        st.success("Analysis complete.")
+                        st.dataframe(result[["Fraud_Prediction", "Fraud_Probability"]].head(10), use_container_width=True)
+                        st.metric("Total Flagged Frauds", int((predictions == 1).sum()))
+                    except Exception as exc:  # pragma: no cover - UI safety net
+                        st.error(f"Prediction failed: {exc}")
